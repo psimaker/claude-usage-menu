@@ -9,7 +9,7 @@ struct SettingsView: View {
     @State private var warningThreshold: Double = 80
     @State private var criticalThreshold: Double = 90
     @State private var notificationsEnabled: Bool = true
-    @State private var compactDisplay: Bool = true
+    @State private var compactDisplay: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,10 +34,15 @@ struct SettingsView: View {
                 }
 
                 Section("Menu Bar") {
-                    Toggle("Compact display (5h · 7d)", isOn: $compactDisplay)
+                    Toggle("Compact mode (45% · 78%)", isOn: $compactDisplay)
                         .onChange(of: compactDisplay) { newValue in
                             settingsManager.setCompactDisplay(newValue)
                         }
+                    Text(compactDisplay
+                         ? "Both percentages shown inline."
+                         : "Labeled “5h Limit” and “Weekly Limit” columns.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("Notifications") {

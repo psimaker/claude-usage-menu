@@ -47,10 +47,15 @@ Or open `ClaudeUsageSystray.xcodeproj` in Xcode and run with ⌘R.
 
 ## Display modes
 
-Toggle **Compact display** in Settings to switch between:
+Toggle **Compact mode** in Settings to switch between:
 
-- **Compact (default):** `35% · 71%` — both 5h and 7d inline, each colored by threshold
-- **Normal:** icon + `71%` — weekly usage only
+- **Labeled (default):** a two-column layout — `5h Limit` with its percentage on the
+  left and `Weekly Limit` with its percentage on the right, each colored by threshold
+- **Compact:** `35% · 71%` — both percentages inline, for tight menu bars
+
+Both adapt to light/dark menu bars, and the percentages turn orange/red as they
+cross your warning/critical thresholds. Before the first successful fetch (or while
+signed out) the values show `—` and the tooltip explains why.
 
 ## How it works
 
@@ -62,7 +67,10 @@ Authorization: Bearer <oauth_token>
 anthropic-beta: oauth-2025-04-20
 ```
 
-The token is read once at startup and cached in memory. It refreshes automatically when you restart the app (Claude Code keeps it current in the Keychain).
+The token is read from the Keychain and cached in memory until shortly before it
+expires, then re-read automatically — and also re-read if a request comes back
+unauthorized — so a token Claude Code has refreshed is picked up without restarting
+the app. Requests use a 30s timeout and back off on rate limits and transient errors.
 
 > **Note:** This endpoint is undocumented and may change. It requires Claude Code to be installed and logged in.
 
@@ -70,10 +78,10 @@ The token is read once at startup and cached in memory. It refreshes automatical
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Compact display | On | Show both 5h and 7d in menu bar |
+| Compact mode | Off | On = inline `5h% · 7d%`; Off = labeled two-column layout |
 | Warning threshold | 80% | Orange color above this |
 | Critical threshold | 90% | Red color above this |
-| Usage alerts | On | macOS notification when thresholds are crossed |
+| Usage alerts | On | macOS notification when thresholds are crossed (once per period) |
 
 ## Running tests
 
