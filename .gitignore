@@ -2,11 +2,16 @@
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcuserstate
 DerivedData/
 build/
 *.ipa
 *.dSYM.zip
 *.dSYM
+
+# Coverage / test artifacts
+*.profraw
 
 # macOS
 .DS_Store
