@@ -41,6 +41,27 @@ final class OAuthUsageResponseTests: XCTestCase {
         XCTAssertEqual(response.fiveHour?.utilization, 10.0)
     }
 
+    func testDecodesSonnetWithNullResetsAt() throws {
+        // Regression: the live API returns a present seven_day_sonnet object whose
+        // resets_at is null when there is no active Sonnet window (utilization 0).
+        // A non-optional resetsAt made the WHOLE response decode throw → blank stats.
+        let json = """
+        {
+          "five_hour":   { "utilization": 5.0, "resets_at": "2026-06-04T20:50:00.287325+00:00" },
+          "seven_day":   { "utilization": 10.0, "resets_at": "2026-06-10T18:00:00.287350+00:00" },
+          "seven_day_sonnet": { "utilization": 0.0, "resets_at": null }
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(OAuthUsageResponse.self, from: json)
+
+        XCTAssertEqual(response.fiveHour?.utilization, 5.0)
+        XCTAssertEqual(response.sevenDay?.utilization, 10.0)
+        XCTAssertEqual(response.sevenDaySonnet?.utilization, 0.0)
+        XCTAssertNil(response.sevenDaySonnet?.resetsAt)
+        XCTAssertNil(response.sevenDaySonnet?.resetsAtDate)
+    }
+
     func testDecodesAllNulls() throws {
         let json = """
         {
