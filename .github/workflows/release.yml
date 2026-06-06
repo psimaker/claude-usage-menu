@@ -115,7 +115,14 @@ jobs:
               ClaudeUsageSystray.dmg
           fi
 
+          # Sign the DMG container itself with Developer ID so Gatekeeper accepts
+          # the disk image unambiguously (the app inside is already signed).
+          codesign --force --timestamp \
+            --sign "Developer ID Application" \
+            ClaudeUsageSystray.dmg
+
           ls -lh ClaudeUsageSystray.dmg
+          codesign --verify --verbose ClaudeUsageSystray.dmg
 
       - name: Notarize DMG
         env:
