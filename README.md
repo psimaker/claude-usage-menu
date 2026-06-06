@@ -5,6 +5,13 @@ usage in real time — current session and weekly limits — without opening a b
 
 ![Claude Usage Menu](claude-usage-menu/Resources/Assets.xcassets/Image.imageset/Image.png)
 
+> **Credits / origin:** This project began as a fork of
+> [`adntgv/claude-usage-systray`](https://github.com/adntgv/claude-usage-systray) by
+> [@adntgv](https://github.com/adntgv). It has since been substantially rewritten and
+> extended — a production-hardened SwiftUI/AppKit UI, a typed usage service with
+> token-refresh and backoff, accessibility and rendering fixes, a unit-test suite, and
+> automated signed + notarized releases. Thanks to the original author for the idea.
+
 ## What it shows
 
 Mirrors the data on `claude.ai/settings/usage`:
@@ -62,10 +69,14 @@ out) the values show `—` and the tooltip explains why.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| Launch at login | Off | Start the app automatically when you log in (uses `SMAppService`) |
 | Compact mode | Off | On = inline `5h% · 7d%`; Off = labeled two-column layout |
 | Warning threshold | 80% | Percentage above which values turn orange |
 | Critical threshold | 90% | Percentage above which values turn red |
 | Usage alerts | On | macOS notification when a threshold is crossed (once per period) |
+
+The Settings window also shows the current sign-in/auth state and a GitHub link to
+this repository in its header.
 
 ## How it works
 
