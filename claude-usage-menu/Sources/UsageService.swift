@@ -47,6 +47,32 @@ func readOAuthToken() throws -> OAuthToken {
     )
 }
 
+// MARK: - Keychain status classification (pure, testable)
+
+/// Why a Keychain read failed. Distinguishing these matters: a denied/cancelled
+/// access prompt (or an ACL that Claude Code's token rotation reset) is NOT a
+/// sign-out — Claude Code is still logged in and one "Always Allow" click fixes
+/// it — so it must not be surfaced like a missing credential.
+enum KeychainAccessIssue: Equatable {
+    case notSignedIn     // the credential genuinely isn't there
+    case accessDenied    // access prompt denied/dismissed, or ACL revoked
+    case locked          // keychain locked and no UI is allowed right now
+    case other
+}
+
+func classifyKeychainStatus(_ status: OSStatus) -> KeychainAccessIssue {
+    switch status {
+    case errSecItemNotFound:
+        return .notSignedIn
+    case errSecUserCanceled, errSecAuthFailed:
+        return .accessDenied
+    case errSecInteractionNotAllowed:
+        return .locked
+    default:
+        return .other
+    }
+}
+
 // MARK: - ISO8601 parsing (robust to missing fractional seconds)
 
 private let iso8601WithFraction: ISO8601DateFormatter = {
@@ -146,6 +172,11 @@ final class UsageService: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var isLoading: Bool = false
     @Published private(set) var authState: AuthState = .unknown
+    /// True when the last refresh failed because macOS gated the Keychain read
+    /// (a denied/cancelled prompt, or an ACL revoked by Claude Code's token
+    /// rotation). Distinct from a sign-out and recoverable with one click, so
+    /// the menu bar surfaces it as an actionable "Keychain" state, not "stale".
+    @Published private(set) var needsKeychainAccess: Bool = false
 
     private var refreshTimer: Timer?
     private let normalInterval: TimeInterval = 5 * 60    // 5 minutes
@@ -248,6 +279,7 @@ final class UsageService: ObservableObject {
                 await MainActor.run {
                     self.currentUsage = snapshot
                     self.error = nil
+                    self.needsKeychainAccess = false
                     self.authState = .ok
                     self.failureCount = 0
                     self.isLoading = false
@@ -270,7 +302,10 @@ final class UsageService: ObservableObject {
         let isOAuthHTTP = error.domain == "OAuthUsage"
 
         if isOAuthHTTP && error.code == 429 {
-            clearToken()   // a refreshed token may help next time
+            // A 429 is rate limiting, not an auth problem — the cached token is
+            // fine. Don't clear it: a needless re-read can pop a Keychain prompt
+            // (the ACL is reset on Claude Code's token rotation) for nothing.
+            needsKeychainAccess = false
             self.error = "Rate limited — retrying in 15 min"
             scheduleTimer(interval: backoffInterval)
             return
@@ -280,6 +315,7 @@ final class UsageService: ObservableObject {
             // Token expired/revoked: drop the cache so the next poll re-reads
             // the (refreshed) Keychain credential.
             clearToken()
+            needsKeychainAccess = false
             authState = .expired
             self.error = "Sign-in expired — re-reading Claude Code credentials"
             scheduleTimer(interval: normalInterval)
@@ -287,11 +323,36 @@ final class UsageService: ObservableObject {
         }
 
         if error.domain == "Keychain" {
-            authState = .signedOut
+            switch classifyKeychainStatus(OSStatus(error.code)) {
+            case .notSignedIn:
+                needsKeychainAccess = false
+                authState = .signedOut
+                failureCount += 1
+                self.error = "Claude Code not signed in — open Claude Code and log in"
+                scheduleTimer(interval: retryInterval())
+            case .accessDenied:
+                // Claude Code IS signed in; macOS just gated this read. Flag it
+                // as an actionable Keychain prompt (not a sign-out), and back off
+                // to the normal interval so we don't re-prompt every few seconds.
+                needsKeychainAccess = true
+                self.error = "Keychain access needed — click the icon, then “Always Allow”"
+                scheduleTimer(interval: normalInterval)
+            case .locked:
+                needsKeychainAccess = true
+                self.error = "Keychain locked — unlock it to refresh usage"
+                scheduleTimer(interval: normalInterval)
+            case .other:
+                needsKeychainAccess = false
+                failureCount += 1
+                self.error = "Couldn't read Keychain (status \(error.code))"
+                scheduleTimer(interval: retryInterval())
+            }
+            return
         }
+
         // Network / server errors leave authState unchanged: a flaky connection
         // is not a sign-in problem and shouldn't flip the Auth row red.
-
+        needsKeychainAccess = false
         failureCount += 1
         self.error = friendlyMessage(for: error)
         scheduleTimer(interval: retryInterval())

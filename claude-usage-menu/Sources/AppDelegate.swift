@@ -237,6 +237,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateStatusItemAppearance() }
             .store(in: &cancellables)
+        usageService.$needsKeychainAccess
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateStatusItemAppearance() }
+            .store(in: &cancellables)
 
         // Re-color when an appearance-relevant setting (thresholds / display
         // mode) actually changes — driven by the settings model itself rather
@@ -358,6 +362,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // an alarm while the numbers are still fresh.
         let stale = hasData && usageService.error != nil
             && Date().timeIntervalSince(snap.lastUpdated) > 5 * 60
+        // A gated Keychain read is its own state: actionable (one click on the
+        // icon re-triggers the read) and not a sign-out, so it takes priority
+        // over the staleness cue.
+        let needsKeychain = usageService.needsKeychainAccess
 
         let fivePct = displayPercent(snap.fiveHourUtilization)
         let weekPct = displayPercent(snap.sevenDayUtilization)
@@ -366,7 +374,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let fiveColor: NSColor
         let weekColor: NSColor
-        if !hasData || stale {
+        if !hasData || stale || needsKeychain {
             fiveColor = .secondaryLabelColor
             weekColor = .secondaryLabelColor
         } else {
@@ -388,13 +396,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.attributedTitle = str
         } else {
             // Left column: reset symbol + time remaining in the 5h window, % below.
-            let leftSymbol = stale ? "exclamationmark.triangle" : "arrow.clockwise"
+            let leftSymbol: String
             let fiveLabel: String
-            if stale {
+            if needsKeychain {
+                leftSymbol = "key.fill"
+                fiveLabel = "Keychain"
+            } else if stale {
+                leftSymbol = "exclamationmark.triangle"
                 fiveLabel = "stale"
             } else if hasData, let reset = snap.fiveHourResetAt {
+                leftSymbol = "arrow.clockwise"
                 fiveLabel = formatTimeRemaining(until: reset)
             } else {
+                leftSymbol = "arrow.clockwise"
                 fiveLabel = "5h"
             }
             button.attributedTitle = NSAttributedString(string: "")
@@ -409,7 +423,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         // Tooltip + VoiceOver reflect the live state, including failures.
         let description: String
-        if let err = usageService.error, !hasData {
+        if needsKeychain {
+            description = usageService.error ?? "Keychain access needed — click the icon to allow"
+        } else if let err = usageService.error, !hasData {
             description = err
         } else if !hasData {
             description = "Loading Claude usage…"

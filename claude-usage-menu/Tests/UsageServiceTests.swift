@@ -1,4 +1,5 @@
 import XCTest
+import Security
 @testable import ClaudeUsageMenu
 
 // MARK: - OAuthUsageResponse decoding
@@ -367,5 +368,34 @@ final class EffectiveThresholdTests: XCTestCase {
         settings.criticalThreshold = 60
         XCTAssertEqual(settings.effectiveWarningThreshold, 60)
         XCTAssertEqual(settings.effectiveCriticalThreshold, 95)
+    }
+}
+
+// MARK: - classifyKeychainStatus
+
+final class KeychainStatusTests: XCTestCase {
+
+    func testItemNotFoundIsNotSignedIn() {
+        XCTAssertEqual(classifyKeychainStatus(errSecItemNotFound), .notSignedIn)
+    }
+
+    func testUserCanceledIsAccessDenied() {
+        // Regression: a dismissed/denied access prompt — or an ACL revoked by
+        // Claude Code's token rotation — used to be reported as "not signed in",
+        // misdirecting the user to re-login instead of approving the prompt.
+        XCTAssertEqual(classifyKeychainStatus(errSecUserCanceled), .accessDenied)
+    }
+
+    func testAuthFailedIsAccessDenied() {
+        XCTAssertEqual(classifyKeychainStatus(errSecAuthFailed), .accessDenied)
+    }
+
+    func testInteractionNotAllowedIsLocked() {
+        XCTAssertEqual(classifyKeychainStatus(errSecInteractionNotAllowed), .locked)
+    }
+
+    func testSuccessAndUnknownAreOther() {
+        XCTAssertEqual(classifyKeychainStatus(errSecSuccess), .other)
+        XCTAssertEqual(classifyKeychainStatus(-99_999), .other)
     }
 }
