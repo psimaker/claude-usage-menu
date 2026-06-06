@@ -74,7 +74,20 @@ jobs:
       - name: Staple
         run: |
           cd claude-usage-menu
-          xcrun stapler staple build/export/claude-usage-menu.app
+          # The notarization ticket can lag behind notarytool's "Accepted" while it
+          # propagates to Apple's CDN, so retry stapling until the ticket is found.
+          for attempt in $(seq 1 8); do
+            if xcrun stapler staple build/export/claude-usage-menu.app; then
+              echo "Stapled app on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 8 ]; then
+              echo "App stapling still failing after $attempt attempts" >&2
+              exit 1
+            fi
+            echo "Ticket not available yet — retrying in 30s (attempt $attempt)"
+            sleep 30
+          done
           ditto -c -k --keepParent build/export/claude-usage-menu.app claude-usage-menu.zip
 
       - name: Build drag-and-drop DMG
@@ -140,7 +153,19 @@ jobs:
       - name: Staple DMG
         run: |
           cd claude-usage-menu
-          xcrun stapler staple claude-usage-menu.dmg
+          # Same propagation race as the app staple — retry until the ticket lands.
+          for attempt in $(seq 1 8); do
+            if xcrun stapler staple claude-usage-menu.dmg; then
+              echo "Stapled DMG on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -eq 8 ]; then
+              echo "DMG stapling still failing after $attempt attempts" >&2
+              exit 1
+            fi
+            echo "DMG ticket not available yet — retrying in 30s (attempt $attempt)"
+            sleep 30
+          done
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
