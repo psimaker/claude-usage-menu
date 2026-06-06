@@ -17,8 +17,7 @@ jobs:
 
       - name: Import Developer ID certificate
         env:
-          CERTIFICATE_PART1: ${{ secrets.APPLE_CERTIFICATE_1 }}
-          CERTIFICATE_PART2: ${{ secrets.APPLE_CERTIFICATE_2 }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
@@ -28,7 +27,7 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          echo "${CERTIFICATE_PART1}${CERTIFICATE_PART2}" | base64 --decode -o "$RUNNER_TEMP/cert.p12"
+          echo "$APPLE_CERTIFICATE" | base64 --decode -o "$RUNNER_TEMP/cert.p12"
           security import "$RUNNER_TEMP/cert.p12" \
             -k "$KEYCHAIN_PATH" \
             -P "$CERTIFICATE_PASSWORD" \
@@ -75,47 +74,68 @@ jobs:
           xcrun stapler staple build/export/ClaudeUsageSystray.app
           ditto -c -k --keepParent build/export/ClaudeUsageSystray.app ClaudeUsageSystray.zip
 
+      - name: Build drag-and-drop DMG
+        run: |
+          cd claude-usage-systray
+          brew install create-dmg
+
+          # Stage only the (already signed + stapled) app; create-dmg adds the
+          # "Applications" drop link so users can drag the app onto it to install.
+          rm -rf dmg_staging
+          mkdir -p dmg_staging
+          cp -R build/export/ClaudeUsageSystray.app dmg_staging/
+
+          # create-dmg occasionally returns a non-zero exit code on CI even when it
+          # succeeds (Finder/AppleScript timing), so don't fail here — we verify the
+          # artifact exists right after and fall back if it is missing.
+          create-dmg \
+            --volname "Claude Usage Systray" \
+            --window-pos 200 120 \
+            --window-size 640 400 \
+            --icon-size 120 \
+            --icon "ClaudeUsageSystray.app" 160 200 \
+            --hide-extension "ClaudeUsageSystray.app" \
+            --app-drop-link 480 200 \
+            --no-internet-enable \
+            ClaudeUsageSystray.dmg \
+            dmg_staging || true
+
+          # Fallback: a plain DMG that still has the drag-and-drop Applications link,
+          # in case create-dmg's window-layout step fails on the runner.
+          if [ ! -f ClaudeUsageSystray.dmg ]; then
+            echo "create-dmg produced no DMG — falling back to hdiutil"
+            ln -s /Applications dmg_staging/Applications
+            hdiutil create \
+              -volname "Claude Usage Systray" \
+              -srcfolder dmg_staging \
+              -ov -format UDZO \
+              ClaudeUsageSystray.dmg
+          fi
+
+          ls -lh ClaudeUsageSystray.dmg
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          cd claude-usage-systray
+          xcrun notarytool submit ClaudeUsageSystray.dmg \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+
+      - name: Staple DMG
+        run: |
+          cd claude-usage-systray
+          xcrun stapler staple ClaudeUsageSystray.dmg
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: claude-usage-systray/ClaudeUsageSystray.zip
+          files: |
+            claude-usage-systray/ClaudeUsageSystray.zip
+            claude-usage-systray/ClaudeUsageSystray.dmg
           generate_release_notes: true
-
-      - name: Update Homebrew tap
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          VERSION=${TAG#v}
-          SHA=$(shasum -a 256 claude-usage-systray/ClaudeUsageSystray.zip | awk '{print $1}')
-
-          FORMULA="cask \"claude-usage-systray\" do
-            version \"$VERSION\"
-            sha256 \"$SHA\"
-
-            url \"https://github.com/adntgv/claude-usage-systray/releases/download/v#{version}/ClaudeUsageSystray.zip\"
-            name \"Claude Usage Systray\"
-            desc \"macOS menu bar app showing Claude.ai plan usage in real time\"
-            homepage \"https://github.com/adntgv/claude-usage-systray\"
-
-            app \"ClaudeUsageSystray.app\"
-
-            zap trash: [
-              \"~/Library/Preferences/com.adntgv.claude-usage-systray.plist\",
-              \"~/Library/Application Support/ClaudeUsageSystray\",
-            ]
-          end"
-
-          ENCODED=$(echo "$FORMULA" | base64)
-
-          # Get current file SHA (needed for update)
-          CURRENT=$(curl -s \
-            -H "Authorization: token $HOMEBREW_TAP_TOKEN" \
-            https://api.github.com/repos/adntgv/homebrew-tap/contents/Casks/claude-usage-systray.rb)
-          FILE_SHA=$(echo "$CURRENT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('sha',''))")
-
-          curl -s -X PUT \
-            -H "Authorization: token $HOMEBREW_TAP_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/adntgv/homebrew-tap/contents/Casks/claude-usage-systray.rb \
-            -d "{\"message\":\"Update claude-usage-systray to $VERSION\",\"content\":\"$ENCODED\",\"sha\":\"$FILE_SHA\"}"

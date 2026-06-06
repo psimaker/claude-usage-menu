@@ -23,22 +23,19 @@ Colors update based on your configured warning/critical thresholds.
 
 ## Install
 
-**Homebrew (recommended):**
+**DMG (drag and drop) — recommended:**
 
-```bash
-brew tap adntgv/tap
-brew install --cask claude-usage-systray
-```
+Download the latest `ClaudeUsageSystray.dmg` from the [Releases page](https://github.com/psimaker/claude-usage-menu/releases), open it, and drag **ClaudeUsageSystray.app** onto the **Applications** folder shortcut in the window. The DMG is notarized and stapled — macOS opens the app normally on first launch.
 
-**Manual:**
+**Manual (zip):**
 
-Download the latest `ClaudeUsageSystray.zip` from the [Releases page](https://github.com/adntgv/claude-usage-systray/releases), unzip, and move `ClaudeUsageSystray.app` to `/Applications`. The app is notarized — macOS will open it normally on first launch.
+Alternatively, download `ClaudeUsageSystray.zip`, unzip, and move `ClaudeUsageSystray.app` to `/Applications`.
 
 ## Build from source
 
 ```bash
-git clone https://github.com/adntgv/claude-usage-systray
-cd claude-usage-systray/claude-usage-systray
+git clone https://github.com/psimaker/claude-usage-menu
+cd claude-usage-menu/claude-usage-systray
 xcodebuild -scheme ClaudeUsageSystray -configuration Release build
 open ~/Library/Developer/Xcode/DerivedData/ClaudeUsageSystray-*/Build/Products/Release/ClaudeUsageSystray.app
 ```
