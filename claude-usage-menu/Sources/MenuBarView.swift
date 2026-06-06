@@ -68,7 +68,9 @@ struct MenuBarView: View {
                 .accessibilityValue("\(displayPercent(sonnet)) percent used")
             }
 
-            statusLine
+            if showsStatusLine {
+                statusLine
+            }
         }
         .padding(.horizontal, 12)
     }
@@ -114,6 +116,13 @@ struct MenuBarView: View {
         .accessibilityValue(rowAccessibilityValue(hasData: hasData, percent: shown, level: level, resetAt: resetAt))
     }
 
+    // The status line now only carries the error and first-load states; the
+    // success "Updated …" timestamp moved to the Refresh row (refreshTrailing),
+    // so it collapses entirely once data has loaded successfully.
+    private var showsStatusLine: Bool {
+        usageService.error != nil || (usageService.isLoading && !snapshot.hasData)
+    }
+
     private var statusLine: some View {
         HStack(spacing: 6) {
             if let error = usageService.error {
@@ -121,19 +130,15 @@ struct MenuBarView: View {
                     .font(.caption2).foregroundColor(.orange).accessibilityHidden(true)
                 Text(error).font(.caption2).foregroundColor(.secondary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            } else if usageService.isLoading && !snapshot.hasData {
+                Spacer(minLength: 0)
+                if usageService.isLoading {   // retry in progress
+                    ProgressView().controlSize(.small)
+                }
+            } else {
+                // isLoading && !hasData — the initial load.
                 ProgressView().controlSize(.small)
                 Text("Loading…").font(.caption2).foregroundColor(.secondary)
-            } else if snapshot.hasData {
-                Image(systemName: "checkmark.circle")
-                    .font(.caption2).foregroundColor(.green).accessibilityHidden(true)
-                Text("Updated \(relativeUpdated)").font(.caption2).foregroundColor(.secondary)
-            }
-            Spacer()
-            // Show progress for any in-flight refresh that isn't the initial
-            // load (so a retry after an error still gives feedback).
-            if usageService.isLoading && (snapshot.hasData || usageService.error != nil) {
-                ProgressView().controlSize(.small)
+                Spacer(minLength: 0)
             }
         }
     }
@@ -143,12 +148,22 @@ struct MenuBarView: View {
     private var actionButtons: some View {
         VStack(spacing: 0) {
             MenuRow(icon: "chart.bar", title: "Open Dashboard", action: openDashboard)
-            // Refresh stays a normal, always-tappable row — the in-flight state
-            // is shown by the status-line spinner, and UsageService's single-flight
-            // guard makes a tap during an in-flight fetch a safe no-op. (Disabling
-            // it here would also disable it during the automatic refresh-on-open.)
-            MenuRow(icon: "arrow.clockwise", title: "Refresh", action: refreshUsage)
+            // Refresh stays a normal, always-tappable row (single-flight makes a
+            // tap during an in-flight fetch a safe no-op). Its trailing edge shows
+            // a spinner while refreshing, otherwise the grey "Updated …" timestamp.
+            MenuRow(icon: "arrow.clockwise", title: "Refresh",
+                    trailing: AnyView(refreshTrailing), action: refreshUsage)
             MenuRow(icon: "gear", title: "Settings", action: openSettings)
+        }
+    }
+
+    @ViewBuilder private var refreshTrailing: some View {
+        if usageService.isLoading && snapshot.hasData {
+            ProgressView().controlSize(.small)
+        } else if snapshot.hasData && usageService.error == nil {
+            Text("Updated \(relativeUpdated)")
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
     }
 
@@ -220,6 +235,7 @@ struct MenuBarView: View {
 private struct MenuRow: View {
     let icon: String?
     let title: String
+    var trailing: AnyView? = nil
     let action: () -> Void
     @State private var hovered = false
 
@@ -235,6 +251,9 @@ private struct MenuRow: View {
                 .accessibilityHidden(true)
                 Text(title)
                 Spacer()
+                if let trailing = trailing {
+                    trailing
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
