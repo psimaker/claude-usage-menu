@@ -158,4 +158,9 @@ Signing/notarization rely on these repository secrets: `APPLE_CERTIFICATE`,
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE) © Umut Erdem (psimaker).
+
+This project began as a fork of
+[`adntgv/claude-usage-systray`](https://github.com/adntgv/claude-usage-systray), which
+does not carry its own license. The MIT license here covers this project's own code and
+contributions; credit for the original idea goes to [@adntgv](https://github.com/adntgv).
