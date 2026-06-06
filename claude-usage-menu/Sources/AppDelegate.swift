@@ -35,8 +35,11 @@ enum MenuBarRenderer {
         let image = NSImage(size: NSSize(width: max(totalW, 1), height: height), flipped: false) { _ in
             let lineGap: CGFloat = 0
             func draw(_ col: Column, originX: CGFloat, colW: CGFloat) {
+                // labelColor (full opacity, adaptive) — NOT secondaryLabelColor,
+                // whose reduced alpha (~50% black in Light Mode) washes the small
+                // top label out to an unreadable grey on a light menu bar.
                 let labelAttrs: [NSAttributedString.Key: Any] = [
-                    .font: labelFont, .foregroundColor: NSColor.secondaryLabelColor
+                    .font: labelFont, .foregroundColor: NSColor.labelColor
                 ]
                 let valueAttrs: [NSAttributedString.Key: Any] = [
                     .font: valueFont, .foregroundColor: col.valueColor
