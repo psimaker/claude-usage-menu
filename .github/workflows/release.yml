@@ -44,6 +44,9 @@ jobs:
             -scheme ClaudeUsageSystray \
             -configuration Release \
             -archivePath build/ClaudeUsageSystray.xcarchive \
+            DEVELOPMENT_TEAM=WVK7Q85W7R \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
             archive
 
       - name: Export (Developer ID signed)
