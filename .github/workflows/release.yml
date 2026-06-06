@@ -69,7 +69,19 @@ jobs:
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
-            --wait
+            --wait --output-format json | tee notary.json
+          SUBMISSION_ID=$(python3 -c "import json;print(json.load(open('notary.json'))['id'])")
+          STATUS=$(python3 -c "import json;print(json.load(open('notary.json'))['status'])")
+          echo "Notarization status: $STATUS (submission $SUBMISSION_ID)"
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::group::notarytool log (failure detail)"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" || true
+            echo "::endgroup::"
+            exit 1
+          fi
 
       - name: Staple
         run: |
