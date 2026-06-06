@@ -39,11 +39,11 @@ jobs:
 
       - name: Archive
         run: |
-          cd claude-usage-systray
+          cd claude-usage-menu
           xcodebuild \
-            -scheme ClaudeUsageSystray \
+            -scheme claude-usage-menu \
             -configuration Release \
-            -archivePath build/ClaudeUsageSystray.xcarchive \
+            -archivePath build/claude-usage-menu.xcarchive \
             DEVELOPMENT_TEAM=WVK7Q85W7R \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
@@ -51,9 +51,9 @@ jobs:
 
       - name: Export (Developer ID signed)
         run: |
-          cd claude-usage-systray
+          cd claude-usage-menu
           xcodebuild -exportArchive \
-            -archivePath build/ClaudeUsageSystray.xcarchive \
+            -archivePath build/claude-usage-menu.xcarchive \
             -exportPath build/export \
             -exportOptionsPlist ExportOptions.plist
 
@@ -63,9 +63,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
-          cd claude-usage-systray
-          ditto -c -k --keepParent build/export/ClaudeUsageSystray.app ClaudeUsageSystray.zip
-          xcrun notarytool submit ClaudeUsageSystray.zip \
+          cd claude-usage-menu
+          ditto -c -k --keepParent build/export/claude-usage-menu.app claude-usage-menu.zip
+          xcrun notarytool submit claude-usage-menu.zip \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
@@ -73,56 +73,56 @@ jobs:
 
       - name: Staple
         run: |
-          cd claude-usage-systray
-          xcrun stapler staple build/export/ClaudeUsageSystray.app
-          ditto -c -k --keepParent build/export/ClaudeUsageSystray.app ClaudeUsageSystray.zip
+          cd claude-usage-menu
+          xcrun stapler staple build/export/claude-usage-menu.app
+          ditto -c -k --keepParent build/export/claude-usage-menu.app claude-usage-menu.zip
 
       - name: Build drag-and-drop DMG
         run: |
-          cd claude-usage-systray
+          cd claude-usage-menu
           brew install create-dmg
 
           # Stage only the (already signed + stapled) app; create-dmg adds the
           # "Applications" drop link so users can drag the app onto it to install.
           rm -rf dmg_staging
           mkdir -p dmg_staging
-          cp -R build/export/ClaudeUsageSystray.app dmg_staging/
+          cp -R build/export/claude-usage-menu.app dmg_staging/
 
           # create-dmg occasionally returns a non-zero exit code on CI even when it
           # succeeds (Finder/AppleScript timing), so don't fail here — we verify the
           # artifact exists right after and fall back if it is missing.
           create-dmg \
-            --volname "Claude Usage Systray" \
+            --volname "Claude Usage Menu" \
             --window-pos 200 120 \
             --window-size 640 400 \
             --icon-size 120 \
-            --icon "ClaudeUsageSystray.app" 160 200 \
-            --hide-extension "ClaudeUsageSystray.app" \
+            --icon "claude-usage-menu.app" 160 200 \
+            --hide-extension "claude-usage-menu.app" \
             --app-drop-link 480 200 \
             --no-internet-enable \
-            ClaudeUsageSystray.dmg \
+            claude-usage-menu.dmg \
             dmg_staging || true
 
           # Fallback: a plain DMG that still has the drag-and-drop Applications link,
           # in case create-dmg's window-layout step fails on the runner.
-          if [ ! -f ClaudeUsageSystray.dmg ]; then
+          if [ ! -f claude-usage-menu.dmg ]; then
             echo "create-dmg produced no DMG — falling back to hdiutil"
             ln -s /Applications dmg_staging/Applications
             hdiutil create \
-              -volname "Claude Usage Systray" \
+              -volname "Claude Usage Menu" \
               -srcfolder dmg_staging \
               -ov -format UDZO \
-              ClaudeUsageSystray.dmg
+              claude-usage-menu.dmg
           fi
 
           # Sign the DMG container itself with Developer ID so Gatekeeper accepts
           # the disk image unambiguously (the app inside is already signed).
           codesign --force --timestamp \
             --sign "Developer ID Application" \
-            ClaudeUsageSystray.dmg
+            claude-usage-menu.dmg
 
-          ls -lh ClaudeUsageSystray.dmg
-          codesign --verify --verbose ClaudeUsageSystray.dmg
+          ls -lh claude-usage-menu.dmg
+          codesign --verify --verbose claude-usage-menu.dmg
 
       - name: Notarize DMG
         env:
@@ -130,8 +130,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
-          cd claude-usage-systray
-          xcrun notarytool submit ClaudeUsageSystray.dmg \
+          cd claude-usage-menu
+          xcrun notarytool submit claude-usage-menu.dmg \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
@@ -139,13 +139,13 @@ jobs:
 
       - name: Staple DMG
         run: |
-          cd claude-usage-systray
-          xcrun stapler staple ClaudeUsageSystray.dmg
+          cd claude-usage-menu
+          xcrun stapler staple claude-usage-menu.dmg
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            claude-usage-systray/ClaudeUsageSystray.zip
-            claude-usage-systray/ClaudeUsageSystray.dmg
+            claude-usage-menu/claude-usage-menu.zip
+            claude-usage-menu/claude-usage-menu.dmg
           generate_release_notes: true

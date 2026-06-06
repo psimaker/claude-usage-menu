@@ -1,0 +1,467 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		173A87109DE571CA6C856B38 /* UsageServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3AE37D8A4B42D0964702FC /* UsageServiceTests.swift */; };
+		4DC85AA7DE9B21E444F7F65B /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD87F9FC5571DD08E536062B /* SettingsManager.swift */; };
+		4F7D68E6C568660505CBCA1E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5DE03BDB0E6D981BB795563 /* Assets.xcassets */; };
+		6A820E8A00DE7DEEB9F020E9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E85D385344D1EE3EBE3A4B /* SettingsView.swift */; };
+		8DEAB6E30C3061CF81FC8193 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F06AD18C997FAD77E3F3D2C /* main.swift */; };
+		9251EB39380E17058D14C239 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADE931F6D2E474F8410C0F74 /* MenuBarView.swift */; };
+		9F67BFE800B51C4A25413173 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0AB2DFB029717410CAE68A6 /* Security.framework */; };
+		A34A648CE9CBAE7125BC23E1 /* UsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36DC2D2421ADCF2531DBB5BB /* UsageService.swift */; };
+		C8C27C41959FD7679A89FD68 /* UsageData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2585DE649FDC5745F27D8BFF /* UsageData.swift */; };
+		E4226677F656B90672183688 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7D936B496AB6703DF24EF49 /* AppDelegate.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1F104222DBDF8B018E2D2D8B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C63292D0675C02F9539DA17B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5529AC35B92890BB36581099;
+			remoteInfo = "claude-usage-menu";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		011DA328FD78AC0CAE83F75F /* claude-usage-menu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "claude-usage-menu.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2585DE649FDC5745F27D8BFF /* UsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageData.swift; sourceTree = "<group>"; };
+		36DC2D2421ADCF2531DBB5BB /* UsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageService.swift; sourceTree = "<group>"; };
+		57E85D385344D1EE3EBE3A4B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		5FDD314EDF592AE8AECAAD16 /* claude-usage-menu.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "claude-usage-menu.entitlements"; sourceTree = "<group>"; };
+		6948BA70CF147DE29621C62F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		6F06AD18C997FAD77E3F3D2C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		8D3AE37D8A4B42D0964702FC /* UsageServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageServiceTests.swift; sourceTree = "<group>"; };
+		A0AB2DFB029717410CAE68A6 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		A5DE03BDB0E6D981BB795563 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		ADE931F6D2E474F8410C0F74 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		D7D936B496AB6703DF24EF49 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		EB966A2AA6154D7BE853A5AD /* claude-usage-menuTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "claude-usage-menuTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD87F9FC5571DD08E536062B /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C34B408E5DB52F04D2B4419A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9F67BFE800B51C4A25413173 /* Security.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5E1270E687DE0880219C2236 = {
+			isa = PBXGroup;
+			children = (
+				BA7608DCF398BED00DF87A31 /* Resources */,
+				EEF84B3A01C39A004627397D /* Sources */,
+				D7979DAC2EE62F647BA43B11 /* Tests */,
+				7684B4B3D80CB20A5D601557 /* Frameworks */,
+				EBD8CACB19CAAB12EB336CBE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7684B4B3D80CB20A5D601557 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A0AB2DFB029717410CAE68A6 /* Security.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		BA7608DCF398BED00DF87A31 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A5DE03BDB0E6D981BB795563 /* Assets.xcassets */,
+				5FDD314EDF592AE8AECAAD16 /* claude-usage-menu.entitlements */,
+				6948BA70CF147DE29621C62F /* Info.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		D7979DAC2EE62F647BA43B11 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				8D3AE37D8A4B42D0964702FC /* UsageServiceTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		EBD8CACB19CAAB12EB336CBE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				011DA328FD78AC0CAE83F75F /* claude-usage-menu.app */,
+				EB966A2AA6154D7BE853A5AD /* claude-usage-menuTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		EEF84B3A01C39A004627397D /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				D7D936B496AB6703DF24EF49 /* AppDelegate.swift */,
+				6F06AD18C997FAD77E3F3D2C /* main.swift */,
+				ADE931F6D2E474F8410C0F74 /* MenuBarView.swift */,
+				FD87F9FC5571DD08E536062B /* SettingsManager.swift */,
+				57E85D385344D1EE3EBE3A4B /* SettingsView.swift */,
+				2585DE649FDC5745F27D8BFF /* UsageData.swift */,
+				36DC2D2421ADCF2531DBB5BB /* UsageService.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5529AC35B92890BB36581099 /* claude-usage-menu */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE95FFCC2F7F33E007D4CBCD /* Build configuration list for PBXNativeTarget "claude-usage-menu" */;
+			buildPhases = (
+				F99105AA9E8F8B2939A24376 /* Sources */,
+				0887FBD3ECB54826173F3439 /* Resources */,
+				C34B408E5DB52F04D2B4419A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "claude-usage-menu";
+			packageProductDependencies = (
+			);
+			productName = "claude-usage-menu";
+			productReference = 011DA328FD78AC0CAE83F75F /* claude-usage-menu.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B350B6CD9A122B4582BC07D1 /* claude-usage-menuTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90DF8B7FB699A8539EA59B5A /* Build configuration list for PBXNativeTarget "claude-usage-menuTests" */;
+			buildPhases = (
+				321666829C65754606731796 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8CDEF19E0EF0C3695AFE9A46 /* PBXTargetDependency */,
+			);
+			name = "claude-usage-menuTests";
+			packageProductDependencies = (
+			);
+			productName = "claude-usage-menuTests";
+			productReference = EB966A2AA6154D7BE853A5AD /* claude-usage-menuTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C63292D0675C02F9539DA17B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					5529AC35B92890BB36581099 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+					B350B6CD9A122B4582BC07D1 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = B65FD779566CE304C3272FCC /* Build configuration list for PBXProject "claude-usage-menu" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5E1270E687DE0880219C2236;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = EBD8CACB19CAAB12EB336CBE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5529AC35B92890BB36581099 /* claude-usage-menu */,
+				B350B6CD9A122B4582BC07D1 /* claude-usage-menuTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0887FBD3ECB54826173F3439 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F7D68E6C568660505CBCA1E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		321666829C65754606731796 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				173A87109DE571CA6C856B38 /* UsageServiceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F99105AA9E8F8B2939A24376 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E4226677F656B90672183688 /* AppDelegate.swift in Sources */,
+				9251EB39380E17058D14C239 /* MenuBarView.swift in Sources */,
+				4DC85AA7DE9B21E444F7F65B /* SettingsManager.swift in Sources */,
+				6A820E8A00DE7DEEB9F020E9 /* SettingsView.swift in Sources */,
+				C8C27C41959FD7679A89FD68 /* UsageData.swift in Sources */,
+				A34A648CE9CBAE7125BC23E1 /* UsageService.swift in Sources */,
+				8DEAB6E30C3061CF81FC8193 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8CDEF19E0EF0C3695AFE9A46 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5529AC35B92890BB36581099 /* claude-usage-menu */;
+			targetProxy = 1F104222DBDF8B018E2D2D8B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1B32BF89FF4A144D225F98F8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Resources/claude-usage-menu.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LSUIElement = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.claude.usage-menu";
+				PRODUCT_MODULE_NAME = ClaudeUsageMenu;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		1D9E082690D8E14A7FB3273C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.claude.usage-menu-tests";
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/claude-usage-menu.app/Contents/MacOS/claude-usage-menu";
+			};
+			name = Debug;
+		};
+		6A8D4325C8CD7F9E332DDBFA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Resources/claude-usage-menu.entitlements";
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
+				LSUIElement = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.claude.usage-menu";
+				PRODUCT_MODULE_NAME = ClaudeUsageMenu;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		7741031E3F151C658F485C6F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		CF69AF6BCFBF816AAF2DD475 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.claude.usage-menu-tests";
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/claude-usage-menu.app/Contents/MacOS/claude-usage-menu";
+			};
+			name = Release;
+		};
+		D6AE8C4DD145B36DFFEFFD64 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		90DF8B7FB699A8539EA59B5A /* Build configuration list for PBXNativeTarget "claude-usage-menuTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1D9E082690D8E14A7FB3273C /* Debug */,
+				CF69AF6BCFBF816AAF2DD475 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AE95FFCC2F7F33E007D4CBCD /* Build configuration list for PBXNativeTarget "claude-usage-menu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B32BF89FF4A144D225F98F8 /* Debug */,
+				6A8D4325C8CD7F9E332DDBFA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B65FD779566CE304C3272FCC /* Build configuration list for PBXProject "claude-usage-menu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D6AE8C4DD145B36DFFEFFD64 /* Debug */,
+				7741031E3F151C658F485C6F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C63292D0675C02F9539DA17B /* Project object */;
+}

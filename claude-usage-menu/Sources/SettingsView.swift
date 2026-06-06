@@ -82,7 +82,7 @@ struct SettingsView: View {
             Image(systemName: "chart.pie.fill")
                 .font(.title)
                 .foregroundColor(.blue)
-            Text("Claude Usage Settings")
+            Text("Claude Usage Menu Settings")
                 .font(.headline)
             Spacer()
             Button(action: { dismiss() }) {

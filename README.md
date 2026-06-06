@@ -1,8 +1,9 @@
-# Claude Usage Systray
+# Claude Usage Menu
 
-A lightweight macOS menu bar app that shows your [Claude.ai](https://claude.ai) plan usage in real time — current session and weekly limits — without opening a browser.
+A lightweight macOS menu bar app that shows your [Claude.ai](https://claude.ai) plan
+usage in real time — current session and weekly limits — without opening a browser.
 
-![Claude Usage Systray](claude-usage-systray/Resources/Assets.xcassets/Image.imageset/Image.png)
+![Claude Usage Menu](claude-usage-menu/Resources/Assets.xcassets/Image.imageset/Image.png)
 
 ## What it shows
 
@@ -12,51 +13,65 @@ Mirrors the data on `claude.ai/settings/usage`:
 |--------|-------------|
 | **5h** | Current session usage (resets every ~5 hours) |
 | **7d** | Weekly all-models usage |
-| **Sonnet** | Weekly Sonnet-only usage (shown in popover) |
+| **Sonnet** | Weekly Sonnet-only usage (shown in the popover) |
 
-Colors update based on your configured warning/critical thresholds.
+The menu bar values turn orange/red as they cross your configured
+warning/critical thresholds.
 
 ## Requirements
 
-- macOS 13+
-- [Claude Code](https://claude.ai/code) installed and logged in (the app reads its OAuth token from your Keychain — no separate credentials needed)
+- macOS 13 (Ventura) or newer
+- [Claude Code](https://claude.ai/code) installed and logged in — the app reads its
+  OAuth token from your Keychain, so there are no separate credentials to enter
 
 ## Install
 
-**DMG (drag and drop) — recommended:**
+### DMG (drag and drop) — recommended
 
-Download the latest `ClaudeUsageSystray.dmg` from the [Releases page](https://github.com/psimaker/claude-usage-menu/releases), open it, and drag **ClaudeUsageSystray.app** onto the **Applications** folder shortcut in the window. The DMG is notarized and stapled — macOS opens the app normally on first launch.
+1. Download the latest **`claude-usage-menu.dmg`** from the
+   [Releases page](https://github.com/psimaker/claude-usage-menu/releases).
+2. Open it and drag **Claude Usage Menu** onto the **Applications** folder shortcut.
+3. Launch it from Applications.
 
-**Manual (zip):**
+The DMG is signed with a Developer ID certificate, notarized by Apple, and stapled —
+so macOS opens it normally on first launch, no right-click "Open" workaround needed.
 
-Alternatively, download `ClaudeUsageSystray.zip`, unzip, and move `ClaudeUsageSystray.app` to `/Applications`.
+### Manual (zip)
 
-## Build from source
+Alternatively, download **`claude-usage-menu.zip`** from the same Releases page, unzip
+it, and move **`claude-usage-menu.app`** to `/Applications`.
 
-```bash
-git clone https://github.com/psimaker/claude-usage-menu
-cd claude-usage-menu/claude-usage-systray
-xcodebuild -scheme ClaudeUsageSystray -configuration Release build
-open ~/Library/Developer/Xcode/DerivedData/ClaudeUsageSystray-*/Build/Products/Release/ClaudeUsageSystray.app
-```
+## Usage
 
-Or open `ClaudeUsageSystray.xcodeproj` in Xcode and run with ⌘R.
+The app lives in the menu bar (it has no Dock icon). Click the menu bar item to open a
+popover with the full breakdown (5h, 7d, and weekly Sonnet) and a link to open the
+settings window.
 
-## Display modes
+### Display modes
 
 Toggle **Compact mode** in Settings to switch between:
 
 - **Labeled (default):** a two-column layout — `5h Limit` with its percentage on the
-  left and `Weekly Limit` with its percentage on the right, each colored by threshold
-- **Compact:** `35% · 71%` — both percentages inline, for tight menu bars
+  left and `Weekly Limit` with its percentage on the right, each colored by threshold.
+- **Compact:** `35% · 71%` — both percentages inline, for tight menu bars.
 
-Both adapt to light/dark menu bars, and the percentages turn orange/red as they
-cross your warning/critical thresholds. Before the first successful fetch (or while
-signed out) the values show `—` and the tooltip explains why.
+Both adapt to light/dark menu bars. Before the first successful fetch (or while signed
+out) the values show `—` and the tooltip explains why.
+
+### Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Compact mode | Off | On = inline `5h% · 7d%`; Off = labeled two-column layout |
+| Warning threshold | 80% | Percentage above which values turn orange |
+| Critical threshold | 90% | Percentage above which values turn red |
+| Usage alerts | On | macOS notification when a threshold is crossed (once per period) |
 
 ## How it works
 
-The app reads your Claude Code OAuth token from the macOS Keychain (`Claude Code-credentials`) and calls the same internal endpoint that powers `claude.ai/settings/usage`:
+The app reads your Claude Code OAuth token from the macOS Keychain
+(`Claude Code-credentials`) and calls the same internal endpoint that powers
+`claude.ai/settings/usage`:
 
 ```
 GET https://api.anthropic.com/api/oauth/usage
@@ -66,27 +81,69 @@ anthropic-beta: oauth-2025-04-20
 
 The token is read from the Keychain and cached in memory until shortly before it
 expires, then re-read automatically — and also re-read if a request comes back
-unauthorized — so a token Claude Code has refreshed is picked up without restarting
-the app. Requests use a 30s timeout and back off on rate limits and transient errors.
+unauthorized — so a token Claude Code has refreshed is picked up without restarting the
+app. Requests use a 30s timeout and back off on rate limits and transient errors.
 
-> **Note:** This endpoint is undocumented and may change. It requires Claude Code to be installed and logged in.
+> **Note:** This endpoint is undocumented and may change. It requires Claude Code to be
+> installed and logged in.
 
-## Settings
+## Build from source
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Compact mode | Off | On = inline `5h% · 7d%`; Off = labeled two-column layout |
-| Warning threshold | 80% | Orange color above this |
-| Critical threshold | 90% | Red color above this |
-| Usage alerts | On | macOS notification when thresholds are crossed (once per period) |
+The Xcode project is generated by [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+from [`project.yml`](claude-usage-menu/project.yml), and the generated
+`claude-usage-menu.xcodeproj` is committed, so you can build straight away:
+
+```bash
+git clone https://github.com/psimaker/claude-usage-menu
+cd claude-usage-menu/claude-usage-menu
+xcodebuild -scheme claude-usage-menu -configuration Release build
+open ~/Library/Developer/Xcode/DerivedData/claude-usage-menu-*/Build/Products/Release/claude-usage-menu.app
+```
+
+Or open `claude-usage-menu.xcodeproj` in Xcode and run with ⌘R.
+
+If you change `project.yml`, regenerate the project before building:
+
+```bash
+brew install xcodegen
+xcodegen generate --spec claude-usage-menu/project.yml
+```
 
 ## Running tests
 
 ```bash
-xcodebuild test -project ClaudeUsageSystray.xcodeproj \
-  -scheme ClaudeUsageSystrayTests \
+cd claude-usage-menu
+xcodebuild test \
+  -project claude-usage-menu.xcodeproj \
+  -scheme claude-usage-menu \
   -destination 'platform=macOS'
 ```
+
+The test bundle is wired into the `claude-usage-menu` scheme's Test action, so the same
+scheme builds the app and runs the tests. CI runs this on every push and pull request
+(see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+## Releases
+
+Releases are fully automated. Pushing a `v*` tag triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which on a macOS
+runner:
+
+1. Builds and archives the app, signed with a **Developer ID Application** certificate.
+2. Notarizes and staples the app.
+3. Builds a drag-and-drop **DMG** (app + `Applications` shortcut), signs it, notarizes
+   and staples it.
+4. Attaches `claude-usage-menu.dmg` and `claude-usage-menu.zip` to a GitHub Release.
+
+Cutting a new release:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+Signing/notarization rely on these repository secrets: `APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_PASSWORD`.
 
 ## License
 

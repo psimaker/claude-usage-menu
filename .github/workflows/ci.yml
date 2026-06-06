@@ -11,10 +11,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run tests
         run: |
-          cd claude-usage-systray
+          cd claude-usage-menu
           xcodebuild test \
-            -project ClaudeUsageSystray.xcodeproj \
-            -scheme ClaudeUsageSystrayTests \
+            -project claude-usage-menu.xcodeproj \
+            -scheme claude-usage-menu \
             -destination 'platform=macOS' \
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
             | grep -E "(Test Case|passed|failed|SUCCEEDED|FAILED)"
