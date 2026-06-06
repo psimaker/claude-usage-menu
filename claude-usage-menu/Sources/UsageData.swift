@@ -1,6 +1,6 @@
 import Foundation
 
-struct AppSettings: Codable {
+struct AppSettings: Codable, Equatable {
     var warningThreshold: Double = 80.0
     var criticalThreshold: Double = 90.0
     var notificationsEnabled: Bool = true
@@ -15,6 +15,27 @@ struct AppSettings: Codable {
     var effectiveWarningThreshold: Double { min(warningThreshold, criticalThreshold) }
     var effectiveCriticalThreshold: Double { max(warningThreshold, criticalThreshold) }
 }
+
+// MARK: - Usage level + display helpers (pure, testable)
+
+/// Threshold band a percentage falls into. The single source of truth for the
+/// color (and the redundant colorblind cue) used by both the menu bar and the
+/// popover, so they can never disagree.
+enum UsageLevel: Equatable {
+    case normal
+    case warning
+    case critical
+}
+
+func usageLevel(percent: Int, warning: Int, critical: Int) -> UsageLevel {
+    if percent >= critical { return .critical }
+    if percent >= warning { return .warning }
+    return .normal
+}
+
+/// Clamps a raw utilization percentage to the 0…100 range shown to the user, so
+/// a server value above 100 (over quota) never renders as a nonsensical "105%".
+func displayPercent(_ raw: Int) -> Int { min(max(raw, 0), 100) }
 
 /// A point-in-time view of the account's usage limits.
 ///

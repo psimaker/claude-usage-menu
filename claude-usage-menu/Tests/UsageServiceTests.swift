@@ -224,6 +224,71 @@ final class OAuthExpiryDateTests: XCTestCase {
     }
 }
 
+// MARK: - usageLevel
+
+final class UsageLevelTests: XCTestCase {
+
+    func testBelowWarningIsNormal() {
+        XCTAssertEqual(usageLevel(percent: 50, warning: 80, critical: 90), .normal)
+    }
+
+    func testAtWarningIsWarning() {
+        XCTAssertEqual(usageLevel(percent: 80, warning: 80, critical: 90), .warning)
+    }
+
+    func testBetweenIsWarning() {
+        XCTAssertEqual(usageLevel(percent: 85, warning: 80, critical: 90), .warning)
+    }
+
+    func testAtCriticalIsCritical() {
+        XCTAssertEqual(usageLevel(percent: 90, warning: 80, critical: 90), .critical)
+    }
+
+    func testAboveCriticalIsCritical() {
+        XCTAssertEqual(usageLevel(percent: 100, warning: 80, critical: 90), .critical)
+    }
+}
+
+// MARK: - displayPercent
+
+final class DisplayPercentTests: XCTestCase {
+
+    func testInRangeUnchanged() {
+        XCTAssertEqual(displayPercent(0), 0)
+        XCTAssertEqual(displayPercent(73), 73)
+        XCTAssertEqual(displayPercent(100), 100)
+    }
+
+    func testOverHundredClampsToHundred() {
+        XCTAssertEqual(displayPercent(105), 100)
+        XCTAssertEqual(displayPercent(9999), 100)
+    }
+
+    func testNegativeClampsToZero() {
+        XCTAssertEqual(displayPercent(-1), 0)
+    }
+}
+
+// MARK: - resetCaption
+
+final class ResetCaptionTests: XCTestCase {
+
+    func testFutureUsesResetsIn() {
+        let now = Date()
+        XCTAssertEqual(resetCaption(until: now.addingTimeInterval(45 * 60), from: now), "resets in 45m")
+    }
+
+    func testAtBoundaryReadsResettingNow() {
+        let now = Date()
+        XCTAssertEqual(resetCaption(until: now, from: now), "resetting now")
+    }
+
+    func testPastReadsResettingNow() {
+        let now = Date()
+        XCTAssertEqual(resetCaption(until: now.addingTimeInterval(-120), from: now), "resetting now")
+    }
+}
+
 // MARK: - evaluateUsageAlert
 
 final class EvaluateUsageAlertTests: XCTestCase {

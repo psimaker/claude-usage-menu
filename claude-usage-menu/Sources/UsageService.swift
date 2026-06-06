@@ -116,6 +116,27 @@ func formatTimeRemaining(until date: Date, from now: Date = Date()) -> String {
     return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
 }
 
+/// Caption for a reset time. Avoids the ungrammatical "resets in now" when the
+/// window is at or just past its reset boundary.
+func resetCaption(until date: Date, from now: Date = Date()) -> String {
+    date.timeIntervalSince(now) <= 0
+        ? "resetting now"
+        : "resets in \(formatTimeRemaining(until: date, from: now))"
+}
+
+// MARK: - Auth state
+
+/// Whether the Claude Code credential is usable, surfaced in Settings so the
+/// "Auth" row reflects reality instead of an always-green placeholder. Only the
+/// definitive auth outcomes flip this — transient network/server errors leave it
+/// untouched so a flaky connection doesn't masquerade as a sign-in problem.
+enum AuthState: Equatable {
+    case unknown
+    case ok
+    case signedOut
+    case expired
+}
+
 // MARK: - UsageService
 
 final class UsageService: ObservableObject {
@@ -124,6 +145,7 @@ final class UsageService: ObservableObject {
     @Published private(set) var currentUsage: UsageSnapshot = .placeholder
     @Published private(set) var error: String?
     @Published private(set) var isLoading: Bool = false
+    @Published private(set) var authState: AuthState = .unknown
 
     private var refreshTimer: Timer?
     private let normalInterval: TimeInterval = 5 * 60    // 5 minutes
@@ -226,6 +248,7 @@ final class UsageService: ObservableObject {
                 await MainActor.run {
                     self.currentUsage = snapshot
                     self.error = nil
+                    self.authState = .ok
                     self.failureCount = 0
                     self.isLoading = false
                     self.isFetching = false
@@ -257,10 +280,17 @@ final class UsageService: ObservableObject {
             // Token expired/revoked: drop the cache so the next poll re-reads
             // the (refreshed) Keychain credential.
             clearToken()
+            authState = .expired
             self.error = "Sign-in expired — re-reading Claude Code credentials"
             scheduleTimer(interval: normalInterval)
             return
         }
+
+        if error.domain == "Keychain" {
+            authState = .signedOut
+        }
+        // Network / server errors leave authState unchanged: a flaky connection
+        // is not a sign-in problem and shouldn't flip the Auth row red.
 
         failureCount += 1
         self.error = friendlyMessage(for: error)

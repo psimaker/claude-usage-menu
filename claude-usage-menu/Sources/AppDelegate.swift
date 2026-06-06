@@ -16,21 +16,24 @@ enum MenuBarRenderer {
         let valueColor: NSColor
     }
 
-    private static let labelFont = NSFont.systemFont(ofSize: 7.5, weight: .regular)
+    private static let labelFont = NSFont.systemFont(ofSize: 8.5, weight: .regular)
     private static let valueFont = NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .semibold)
     private static let symbolPointSize: CGFloat = 8
     private static let symbolGap: CGFloat = 2
 
-    static func image(left: Column, right: Column, height: CGFloat) -> NSImage {
+    /// `leftMinWidth` lets the caller reserve a stable width for the left column
+    /// so the status item doesn't visibly jitter (nudging neighbouring menu-bar
+    /// icons) as the variable-width 5h countdown ticks down.
+    static func image(left: Column, right: Column, height: CGFloat, leftMinWidth: CGFloat = 0) -> NSImage {
         let columnGap: CGFloat = 8
         let hPad: CGFloat = 3
-        let lineGap: CGFloat = 0
 
-        let leftW = columnWidth(left)
+        let leftW = max(columnWidth(left), leftMinWidth)
         let rightW = columnWidth(right)
         let totalW = ceil(hPad + leftW + columnGap + rightW + hPad)
 
         let image = NSImage(size: NSSize(width: max(totalW, 1), height: height), flipped: false) { _ in
+            let lineGap: CGFloat = 0
             func draw(_ col: Column, originX: CGFloat, colW: CGFloat) {
                 let labelAttrs: [NSAttributedString.Key: Any] = [
                     .font: labelFont, .foregroundColor: NSColor.secondaryLabelColor
@@ -45,7 +48,10 @@ enum MenuBarRenderer {
                 let topW = symW + ls.width
 
                 let blockH = max(ls.height, sym?.size.height ?? 0) + lineGap + vs.height
-                let bottom = ((height - blockH) / 2).rounded(.down)
+                // Clamp to a non-negative origin so a block taller than the menu
+                // bar biases downward instead of clipping the top label line off
+                // the top edge.
+                let bottom = max(0, ((height - blockH) / 2).rounded(.down))
                 let topY = bottom + vs.height + lineGap
                 let topStartX = originX + (colW - topW) / 2
 
@@ -65,22 +71,20 @@ enum MenuBarRenderer {
             draw(left, originX: hPad, colW: leftW)
             draw(right, originX: hPad + leftW + columnGap, colW: rightW)
 
-            // Subtle vertical divider between the two columns.
-            let dividerX = (hPad + leftW + columnGap / 2).rounded() + 0.5
+            // Subtle vertical divider between the two columns. A filled 1pt rect
+            // aligned to an integer x renders crisply at any backing scale (a
+            // half-point stroke straddles two device pixels on 1× displays).
+            let dividerX = (hPad + leftW + columnGap / 2).rounded()
             let inset: CGFloat = 4
-            let divider = NSBezierPath()
-            divider.move(to: NSPoint(x: dividerX, y: inset))
-            divider.line(to: NSPoint(x: dividerX, y: height - inset))
-            NSColor.tertiaryLabelColor.setStroke()
-            divider.lineWidth = 1
-            divider.stroke()
+            NSColor.tertiaryLabelColor.setFill()
+            NSBezierPath(rect: NSRect(x: dividerX, y: inset, width: 1, height: max(0, height - inset * 2))).fill()
             return true
         }
         image.isTemplate = false
         return image
     }
 
-    private static func columnWidth(_ col: Column) -> CGFloat {
+    static func columnWidth(_ col: Column) -> CGFloat {
         let labelW = (col.label as NSString).size(withAttributes: [.font: labelFont]).width
         let valueW = (col.value as NSString).size(withAttributes: [.font: valueFont]).width
         let symW = col.symbol.flatMap { symbolImage($0) }.map { $0.size.width + symbolGap } ?? 0
@@ -104,9 +108,10 @@ enum MenuBarRenderer {
 
 // MARK: - AppDelegate
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
+    private var settingsWindow: NSWindow?
     private let usageService = UsageService.shared
     private let settingsManager = SettingsManager.shared
 
@@ -120,6 +125,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clickMonitor: Any?
     /// Keeps the menu-bar "resets in …" countdown ticking between polls.
     private var menuBarTicker: Timer?
+
+    /// Width reserved for the left column so the status item stays a stable size
+    /// while the 5h countdown ticks. Sized from the widest expected countdown.
+    private lazy var reservedLeftWidth: CGFloat = MenuBarRenderer.columnWidth(
+        // The 5h window's countdown never exceeds "4h 59m", which is also wider
+        // than the "5h" (no data) and "stale" (error) states it alternates with.
+        MenuBarRenderer.Column(symbol: "arrow.clockwise", label: "4h 59m", value: "100%", valueColor: .labelColor)
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -138,6 +151,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         usageService.stopPolling()
         menuBarTicker?.invalidate()
+        menuBarTicker = nil
+        appearanceObservation?.invalidate()
+        appearanceObservation = nil
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickMonitor = nil
+        }
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: Setup
@@ -160,16 +181,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 260, height: 220)
         popover.behavior = .transient
-        popover.animates = true
-        popover.contentViewController = NSHostingController(
+        // Honor the system Reduce Motion accessibility setting.
+        popover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        popover.delegate = self
+
+        let host = NSHostingController(
             rootView: MenuBarView(
                 usageService: usageService,
-                settingsManager: settingsManager
+                settingsManager: settingsManager,
+                openSettings: { [weak self] in self?.openSettings() },
+                dismiss: { [weak self] in self?.closePopover() }
             )
         )
+        // Let SwiftUI drive the popover size live, so rows that appear after the
+        // popover is on screen (Sonnet row, error line, reset lines) grow it
+        // instead of being clipped. `sizingOptions` is available on the 13.0
+        // deployment target.
+        host.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = host
     }
 
     private func setupNotifications() {
+        // Only prompt when alerts are actually enabled (the default). Settings
+        // re-requests/recovers authorization when the user toggles them back on.
+        guard settingsManager.settings.notificationsEnabled else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
             if let error = error {
                 print("Notification authorization error: \(error)")
@@ -187,7 +222,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // Error / loading changes must also be reflected in the menu bar.
+        // Error / loading changes must also be reflected in the menu bar (the
+        // staleness cue keys off `error`).
         usageService.$error
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateStatusItemAppearance() }
@@ -197,11 +233,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] _ in self?.updateStatusItemAppearance() }
             .store(in: &cancellables)
 
-        // Re-color when thresholds / display mode change in Settings.
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(settingsDidChange),
-            name: UserDefaults.didChangeNotification, object: nil
-        )
+        // Re-color when an appearance-relevant setting (thresholds / display
+        // mode) actually changes — driven by the settings model itself rather
+        // than the global UserDefaults notification, so unrelated defaults
+        // writes (e.g. the alert-gate) don't trigger a needless re-render.
+        settingsManager.$settings
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateStatusItemAppearance() }
+            .store(in: &cancellables)
+
         NotificationCenter.default.addObserver(
             self, selector: #selector(closePopover),
             name: NSApplication.didResignActiveNotification, object: nil
@@ -224,37 +265,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // anchors correctly under the status item.
         NSApp.activate(ignoringOtherApps: true)
 
-        // Size the popover to its real content BEFORE showing. Otherwise the
-        // SwiftUI content grows past the placeholder contentSize after the
-        // popover is already on screen, and NSPopover repositions it so the top
-        // is clipped above the screen edge.
-        if let hosted = popover.contentViewController?.view {
-            hosted.layoutSubtreeIfNeeded()
-            let fitting = hosted.fittingSize
-            if fitting.width > 0, fitting.height > 0 {
-                popover.contentSize = fitting
-            }
-        }
-
+        // Re-read Reduce Motion each show so a mid-session accessibility change
+        // is honored without relaunching this long-lived accessory app.
+        popover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
 
         // A transient popover doesn't reliably dismiss for an accessory app;
         // a global click monitor guarantees it closes on any outside click.
+        // Remove any stale monitor first so opens can never accumulate them.
+        if let monitor = clickMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickMonitor = nil
+        }
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.closePopover()
+        }
+
+        // Opening the popover is an explicit "show me current data" gesture, so
+        // refresh if the snapshot is more than 30s old. The single-flight guard
+        // makes this a no-op when a poll is already in flight.
+        if Date().timeIntervalSince(usageService.currentUsage.lastUpdated) > 30 {
+            usageService.fetchUsage()
         }
     }
 
     @objc private func closePopover() {
         popover.performClose(nil)
+    }
+
+    /// Single source of truth for click-monitor teardown: every close path
+    /// (transient self-dismiss, Esc, programmatic) funnels through here.
+    func popoverDidClose(_ notification: Notification) {
         if let monitor = clickMonitor {
             NSEvent.removeMonitor(monitor)
             clickMonitor = nil
         }
     }
 
-    @objc private func settingsDidChange() {
-        updateStatusItemAppearance()
+    // MARK: Settings window
+
+    /// Presents Settings in its own standard window owned by the delegate, so
+    /// its lifetime is fully decoupled from the transient popover (which would
+    /// otherwise tear a popover-hosted sheet down on the next outside click or
+    /// resign-active). Reuses a single retained instance across reopens.
+    func openSettings() {
+        closePopover()
+
+        // Build a fresh hosting controller on every open so the SwiftUI view's
+        // @State is re-seeded and `.onAppear` re-runs (re-reading the live
+        // notification-authorization status and current thresholds) — a reused
+        // window's content view never re-fires onAppear on reopen. `sizingOptions`
+        // lets the window grow to fit conditional rows (e.g. the "notifications
+        // blocked" warning). Both APIs are available on the 13.0 target.
+        let hosting = NSHostingController(
+            rootView: SettingsView(settingsManager: settingsManager, usageService: usageService)
+        )
+        hosting.sizingOptions = [.preferredContentSize]
+
+        if let window = settingsWindow {
+            window.contentViewController = hosting
+        } else {
+            let window = NSWindow(contentViewController: hosting)
+            window.title = "Claude Usage Menu Settings"
+            window.styleMask = [.titled, .closable, .resizable]
+            window.isReleasedWhenClosed = false   // we retain & reuse it
+            window.center()
+            settingsWindow = window
+        }
+
+        // Activate before ordering front so an accessory (LSUIElement) app's
+        // window reliably comes forward and can take focus.
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     // MARK: Menu bar appearance
@@ -264,11 +346,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let snap = usageService.currentUsage
         let hasData = snap.hasData
+        // Data is present, the last refresh failed, AND the data is actually old:
+        // show last-known numbers, dimmed, with a distinct symbol so they read as
+        // stale rather than current. The age gate keeps an expected, short-lived
+        // failure (e.g. a 429 backoff right after a good fetch) from looking like
+        // an alarm while the numbers are still fresh.
+        let stale = hasData && usageService.error != nil
+            && Date().timeIntervalSince(snap.lastUpdated) > 5 * 60
 
-        let fiveValue = hasData ? "\(snap.fiveHourUtilization)%" : "—"
-        let weekValue = hasData ? "\(snap.sevenDayUtilization)%" : "—"
-        let fiveColor = hasData ? usageColor(for: snap.fiveHourUtilization) : .secondaryLabelColor
-        let weekColor = hasData ? usageColor(for: snap.sevenDayUtilization) : .secondaryLabelColor
+        let fivePct = displayPercent(snap.fiveHourUtilization)
+        let weekPct = displayPercent(snap.sevenDayUtilization)
+        let fiveValue = hasData ? "\(fivePct)%" : "—"
+        let weekValue = hasData ? "\(weekPct)%" : "—"
+
+        let fiveColor: NSColor
+        let weekColor: NSColor
+        if !hasData || stale {
+            fiveColor = .secondaryLabelColor
+            weekColor = .secondaryLabelColor
+        } else {
+            fiveColor = usageColor(for: fivePct)
+            weekColor = usageColor(for: weekPct)
+        }
 
         if settingsManager.settings.compactDisplay {
             let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
@@ -284,8 +383,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.attributedTitle = str
         } else {
             // Left column: reset symbol + time remaining in the 5h window, % below.
+            let leftSymbol = stale ? "exclamationmark.triangle" : "arrow.clockwise"
             let fiveLabel: String
-            if hasData, let reset = snap.fiveHourResetAt {
+            if stale {
+                fiveLabel = "stale"
+            } else if hasData, let reset = snap.fiveHourResetAt {
                 fiveLabel = formatTimeRemaining(until: reset)
             } else {
                 fiveLabel = "5h"
@@ -293,9 +395,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.attributedTitle = NSAttributedString(string: "")
             button.imagePosition = .imageOnly
             button.image = MenuBarRenderer.image(
-                left: MenuBarRenderer.Column(symbol: "arrow.clockwise", label: fiveLabel, value: fiveValue, valueColor: fiveColor),
+                left: MenuBarRenderer.Column(symbol: leftSymbol, label: fiveLabel, value: fiveValue, valueColor: fiveColor),
                 right: MenuBarRenderer.Column(label: "Weekly Limit", value: weekValue, valueColor: weekColor),
-                height: NSStatusBar.system.thickness
+                height: NSStatusBar.system.thickness,
+                leftMinWidth: reservedLeftWidth
             )
         }
 
@@ -306,11 +409,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if !hasData {
             description = "Loading Claude usage…"
         } else {
-            var text = "Claude usage — 5h \(snap.fiveHourUtilization)%"
+            var text = "Claude usage — 5h \(fivePct)%"
             if let reset = snap.fiveHourResetAt {
                 text += " (resets in \(formatTimeRemaining(until: reset)))"
             }
-            text += ", Weekly Limit \(snap.sevenDayUtilization)%"
+            text += ", Weekly Limit \(weekPct)%"
             if let err = usageService.error { text += " — last update failed: \(err)" }
             description = text
         }
@@ -319,11 +422,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func usageColor(for percentage: Int) -> NSColor {
-        let critical = Int(settingsManager.settings.effectiveCriticalThreshold)
-        let warning = Int(settingsManager.settings.effectiveWarningThreshold)
-        if percentage >= critical { return .systemRed }
-        if percentage >= warning { return .systemOrange }
-        return .labelColor
+        switch usageLevel(percent: percentage,
+                          warning: Int(settingsManager.settings.effectiveWarningThreshold),
+                          critical: Int(settingsManager.settings.effectiveCriticalThreshold)) {
+        case .critical: return .systemRed
+        case .warning: return .systemOrange
+        case .normal: return .labelColor
+        }
     }
 
     // MARK: Notifications
