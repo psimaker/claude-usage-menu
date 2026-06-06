@@ -64,7 +64,9 @@ enum MenuBarRenderer {
                         y: topY + (ls.height - sym.size.height) / 2,
                         width: sym.size.width, height: sym.size.height
                     )
-                    drawTinted(sym, in: symRect, color: .secondaryLabelColor)
+                    // Match the label text's full-contrast labelColor so the
+                    // symbol stays equally legible on a light menu bar.
+                    drawTinted(sym, in: symRect, color: .labelColor)
                 }
                 (col.label as NSString).draw(at: NSPoint(x: topStartX + symW, y: topY), withAttributes: labelAttrs)
                 (col.value as NSString).draw(
