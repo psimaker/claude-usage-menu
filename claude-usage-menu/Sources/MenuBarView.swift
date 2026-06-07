@@ -220,7 +220,11 @@ struct MenuBarView: View {
     }
 
     private func refreshUsage() {
-        usageService.fetchUsage()
+        // The popover is open, so the app is active: force an interactive re-read
+        // (bypassing the token cache) so a tap can both pick up a rotated token and
+        // surface the "Always Allow" dialog when Claude Code's rotation reset the
+        // Keychain ACL. Harmless when access is already granted (no prompt shown).
+        usageService.fetchUsage(forceInteractive: true)
     }
 
     private func quitApp() {

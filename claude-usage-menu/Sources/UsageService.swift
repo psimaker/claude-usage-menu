@@ -1,5 +1,12 @@
 import Foundation
 import Security
+import os
+
+/// Release-visible diagnostic channel. View with:
+/// `log stream --predicate 'subsystem == "com.claude.usage-menu"'` or in Console.app.
+/// Lets a periodic "Keychain"/"stale" event be explained from the exact OSStatus /
+/// HTTP code without shipping a debug build.
+private let diag = Logger(subsystem: "com.claude.usage-menu", category: "usage")
 
 // MARK: - OAuth Keychain
 
@@ -27,7 +34,29 @@ func oauthExpiryDate(fromRawExpiresAt raw: Double) -> Date? {
     return Date(timeIntervalSince1970: seconds)
 }
 
-func readOAuthToken() throws -> OAuthToken {
+/// Reads the Claude Code OAuth token from the Keychain.
+///
+/// `allowInteraction` decides whether macOS may present the access-confirmation
+/// dialog. Background polls pass `false`: Claude Code's ~8h token rotation resets
+/// the item's ACL, and a *blocking* interactive read fired from the timer's
+/// background Task — while this `LSUIElement` accessory app is inactive — both (a)
+/// often fails to surface the SecurityAgent dialog and (b) stalls the single-flight
+/// guard, wedging every later refresh into a no-op. With interaction suppressed the
+/// read instead returns `errSecInteractionNotAllowed` immediately, which we map to
+/// an actionable "Keychain" state. The interactive read then happens only on an
+/// explicit user action, with the app activated, so the dialog reliably appears.
+func readOAuthToken(allowInteraction: Bool) throws -> OAuthToken {
+    // `SecKeychainSetUserInteractionAllowed` is a process-global toggle that the
+    // legacy file-based keychain (where this generic-password credential lives)
+    // honors for the ACL-confirmation dialog — unlike the modern
+    // `kSecUseAuthenticationUI` options, which only govern access-control UI.
+    // Set it explicitly each read rather than trusting the ambient default, and
+    // restore it to allowed afterwards so a later interactive read can prompt.
+    // Deprecated alongside the whole SecKeychain family, but with no non-deprecated
+    // replacement for this toggle — keep it; the deprecation warning is expected.
+    SecKeychainSetUserInteractionAllowed(allowInteraction)
+    defer { if !allowInteraction { SecKeychainSetUserInteractionAllowed(true) } }
+
     var result: AnyObject?
     let query: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
@@ -54,9 +83,11 @@ func readOAuthToken() throws -> OAuthToken {
 /// sign-out — Claude Code is still logged in and one "Always Allow" click fixes
 /// it — so it must not be surfaced like a missing credential.
 enum KeychainAccessIssue: Equatable {
-    case notSignedIn     // the credential genuinely isn't there
-    case accessDenied    // access prompt denied/dismissed, or ACL revoked
-    case locked          // keychain locked and no UI is allowed right now
+    case notSignedIn          // the credential genuinely isn't there
+    case accessDenied         // an access prompt was denied/dismissed
+    case interactionRequired  // a non-interactive read hit a reset ACL (or a locked
+                              // keychain): a grant/prompt is needed, available on
+                              // the next user-activated interactive read
     case other
 }
 
@@ -67,7 +98,7 @@ func classifyKeychainStatus(_ status: OSStatus) -> KeychainAccessIssue {
     case errSecUserCanceled, errSecAuthFailed:
         return .accessDenied
     case errSecInteractionNotAllowed:
-        return .locked
+        return .interactionRequired
     default:
         return .other
     }
@@ -210,22 +241,29 @@ final class UsageService: ObservableObject {
     /// Returns a valid access token, re-reading the Keychain when the cache is
     /// empty or the token is within 60s of expiry (so a freshly refreshed
     /// Claude Code credential is picked up without an app restart).
-    private func accessToken() throws -> String {
-        tokenLock.lock()
-        if let token = cachedToken {
-            // Re-read only when we KNOW the token is within 60s of expiry.
-            // Unknown expiry ⇒ keep serving the cached token (it is still
-            // cleared on 401/403/429), so we don't hit the Keychain every poll.
-            let nearExpiry = tokenExpiresAt.map { Date() >= $0.addingTimeInterval(-60) } ?? false
-            if !nearExpiry {
-                tokenLock.unlock()
-                return token
+    ///
+    /// `allowInteraction` is forwarded to the Keychain read: background polls pass
+    /// `false` so a reset ACL surfaces as a non-blocking "needs access" status
+    /// instead of stalling on an unshowable prompt. `force` bypasses the cache so
+    /// an explicit user refresh always re-reads the (possibly rotated) credential.
+    private func accessToken(allowInteraction: Bool, force: Bool) throws -> String {
+        if !force {
+            tokenLock.lock()
+            if let token = cachedToken {
+                // Re-read only when we KNOW the token is within 60s of expiry.
+                // Unknown expiry ⇒ keep serving the cached token (it is still
+                // cleared on 401/403/429), so we don't hit the Keychain every poll.
+                let nearExpiry = tokenExpiresAt.map { Date() >= $0.addingTimeInterval(-60) } ?? false
+                if !nearExpiry {
+                    tokenLock.unlock()
+                    return token
+                }
             }
+            tokenLock.unlock()
         }
-        tokenLock.unlock()
 
         // Read the Keychain outside the lock (it can block), then store.
-        let creds = try readOAuthToken()
+        let creds = try readOAuthToken(allowInteraction: allowInteraction)
         tokenLock.lock()
         cachedToken = creds.accessToken
         tokenExpiresAt = creds.expiresAt
@@ -256,14 +294,18 @@ final class UsageService: ObservableObject {
         }
     }
 
-    func fetchUsage() {
+    /// `forceInteractive` marks an explicit user action (icon click / Refresh):
+    /// the app has been activated, so we both allow the Keychain access dialog and
+    /// bypass the token cache to re-read a rotated credential. Automatic polls pass
+    /// `false`, keeping the Keychain read non-blocking and prompt-free.
+    func fetchUsage(forceInteractive: Bool = false) {
         guard !isFetching else { return }   // main-thread single-flight
         isFetching = true
         isLoading = true
 
         Task {
             do {
-                let token = try self.accessToken()
+                let token = try self.accessToken(allowInteraction: forceInteractive, force: forceInteractive)
                 let response = try await self.fetchOAuthUsage(accessToken: token)
 
                 let snapshot = UsageSnapshot(
@@ -301,6 +343,15 @@ final class UsageService: ObservableObject {
     private func handleFailure(_ error: NSError) {
         let isOAuthHTTP = error.domain == "OAuthUsage"
 
+        // Diagnostic ground truth for the periodic "Keychain"/"stale" event: the
+        // exact failure domain+code plus where the cached token's expiry sits
+        // relative to now (the ~8h rotation boundary). Captured in release builds.
+        tokenLock.lock()
+        let exp = tokenExpiresAt
+        tokenLock.unlock()
+        let expDesc = exp.map { "token exp in \(Int($0.timeIntervalSinceNow))s" } ?? "token exp unknown"
+        diag.notice("fetch failed: \(error.domain, privacy: .public) code=\(error.code) — \(expDesc, privacy: .public)")
+
         if isOAuthHTTP && error.code == 429 {
             // A 429 is rate limiting, not an auth problem — the cached token is
             // fine. Don't clear it: a needless re-read can pop a Keychain prompt
@@ -330,16 +381,15 @@ final class UsageService: ObservableObject {
                 failureCount += 1
                 self.error = "Claude Code not signed in — open Claude Code and log in"
                 scheduleTimer(interval: retryInterval())
-            case .accessDenied:
-                // Claude Code IS signed in; macOS just gated this read. Flag it
-                // as an actionable Keychain prompt (not a sign-out), and back off
-                // to the normal interval so we don't re-prompt every few seconds.
+            case .accessDenied, .interactionRequired:
+                // Claude Code IS signed in; macOS just gated this read — the ACL
+                // that Claude Code's ~8h token rotation resets, or a denied prompt.
+                // Flag it as an actionable Keychain state (not a sign-out): a click
+                // on the icon activates the app and re-reads interactively, so the
+                // "Always Allow" dialog reliably appears. Back off to the normal
+                // interval so background polls don't thrash while it's pending.
                 needsKeychainAccess = true
                 self.error = "Keychain access needed — click the icon, then “Always Allow”"
-                scheduleTimer(interval: normalInterval)
-            case .locked:
-                needsKeychainAccess = true
-                self.error = "Keychain locked — unlock it to refresh usage"
                 scheduleTimer(interval: normalInterval)
             case .other:
                 needsKeychainAccess = false

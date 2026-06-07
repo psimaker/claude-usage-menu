@@ -390,8 +390,12 @@ final class KeychainStatusTests: XCTestCase {
         XCTAssertEqual(classifyKeychainStatus(errSecAuthFailed), .accessDenied)
     }
 
-    func testInteractionNotAllowedIsLocked() {
-        XCTAssertEqual(classifyKeychainStatus(errSecInteractionNotAllowed), .locked)
+    func testInteractionNotAllowedIsInteractionRequired() {
+        // A non-interactive background read against an ACL reset by Claude Code's
+        // ~8h token rotation returns this; it must surface as the actionable
+        // "Keychain" state (recoverable on the next user-activated interactive
+        // read), never as a sign-out.
+        XCTAssertEqual(classifyKeychainStatus(errSecInteractionNotAllowed), .interactionRequired)
     }
 
     func testSuccessAndUnknownAreOther() {

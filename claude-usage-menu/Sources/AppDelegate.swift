@@ -290,10 +290,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.closePopover()
         }
 
-        // Opening the popover is an explicit "show me current data" gesture, so
-        // refresh if the snapshot is more than 30s old. The single-flight guard
-        // makes this a no-op when a poll is already in flight.
-        if Date().timeIntervalSince(usageService.currentUsage.lastUpdated) > 30 {
+        // Opening the popover is an explicit "show me current data" gesture. We
+        // just activated the app, so this is also the moment a gated Keychain read
+        // can succeed: if access is needed, re-read interactively (force-bypassing
+        // the token cache) so the "Always Allow" dialog reliably comes to the
+        // front. Otherwise just refresh stale data. The single-flight guard makes
+        // either a no-op when a poll is already in flight.
+        if usageService.needsKeychainAccess {
+            usageService.fetchUsage(forceInteractive: true)
+        } else if Date().timeIntervalSince(usageService.currentUsage.lastUpdated) > 30 {
             usageService.fetchUsage()
         }
     }
