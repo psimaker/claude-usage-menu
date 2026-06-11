@@ -151,6 +151,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         menuBarTicker = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.updateStatusItemAppearance()
         }
+        // The countdown shows whole minutes; a few seconds of slack lets the
+        // system coalesce wakeups in this always-running app.
+        menuBarTicker?.tolerance = 6
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -474,17 +477,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
         if alertGate != previousGate { saveGate() }   // avoid a UserDefaults write every poll
 
+        // Clamp like the menu bar and popover do, so an over-quota value never
+        // reads as a nonsensical "105%".
+        let shownPct = displayPercent(snap.sevenDayUtilization)
         switch level {
         case .critical:
             sendNotification(
                 title: "Critical: Claude Usage",
-                body: "You've used \(snap.sevenDayUtilization)% of your weekly quota. Consider pausing non-essential tasks.",
+                body: "You've used \(shownPct)% of your weekly quota. Consider pausing non-essential tasks.",
                 isCritical: true
             )
         case .warning:
             sendNotification(
                 title: "Warning: Claude Usage",
-                body: "You've used \(snap.sevenDayUtilization)% of your weekly quota.",
+                body: "You've used \(shownPct)% of your weekly quota.",
                 isCritical: false
             )
         case .none:

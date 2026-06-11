@@ -106,6 +106,9 @@ struct SettingsView: View {
                 .onChange(of: settings.notificationsEnabled) { enabled in
                     if enabled { ensureNotificationAuthorization() }
                 }
+            Text("Notifies when weekly usage crosses a threshold (once per period).")
+                .font(.caption)
+                .foregroundColor(.secondary)
 
             if settings.notificationsEnabled && notifAuthStatus == .denied {
                 HStack(spacing: 6) {

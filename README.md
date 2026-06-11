@@ -74,7 +74,7 @@ out) the values show `—` and the tooltip explains why.
 | Compact mode | Off | On = inline `5h% · 7d%`; Off = labeled two-column layout |
 | Warning threshold | 80% | Percentage above which values turn orange |
 | Critical threshold | 90% | Percentage above which values turn red |
-| Usage alerts | On | macOS notification when a threshold is crossed (once per period) |
+| Usage alerts | On | macOS notification when weekly usage crosses a threshold (once per period) |
 
 The Settings window also shows the current sign-in/auth state and a GitHub link to
 this repository in its header.
