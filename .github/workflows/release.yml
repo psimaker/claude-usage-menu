@@ -15,6 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify tag matches app version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" claude-usage-menu/Resources/Info.plist)
+          if [ "$TAG_VERSION" != "$PLIST_VERSION" ]; then
+            echo "Tag v${TAG_VERSION} does not match Info.plist CFBundleShortVersionString ${PLIST_VERSION} — bump the plist before tagging." >&2
+            exit 1
+          fi
+
       - name: Import Developer ID certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -40,11 +49,13 @@ jobs:
       - name: Archive
         run: |
           cd claude-usage-menu
+          # Single source of truth for the team ID is ExportOptions.plist.
+          DEVELOPMENT_TEAM=$(/usr/libexec/PlistBuddy -c "Print :teamID" ExportOptions.plist)
           xcodebuild \
             -scheme claude-usage-menu \
             -configuration Release \
             -archivePath build/claude-usage-menu.xcarchive \
-            DEVELOPMENT_TEAM=WVK7Q85W7R \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Developer ID Application" \
             archive
