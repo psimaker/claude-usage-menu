@@ -91,10 +91,16 @@ Authorization: Bearer <oauth_token>
 anthropic-beta: oauth-2025-04-20
 ```
 
-The token is read from the Keychain and cached in memory until shortly before it
-expires, then re-read automatically — and also re-read if a request comes back
-unauthorized — so a token Claude Code has refreshed is picked up without restarting the
-app. Requests use a 30s timeout and back off on rate limits and transient errors.
+The credential is read through the `security` CLI (`/usr/bin/security
+find-generic-password`) — the same binary Claude Code itself uses to write it — so the
+read keeps working across Claude Code's periodic (~8h) token rotation without any
+macOS Keychain prompt. If that read ever fails, the app falls back to a direct
+Security.framework read, which may ask for Keychain access once ("Always Allow").
+
+The token is cached in memory until shortly before it expires, then re-read
+automatically — and also re-read if a request comes back unauthorized — so a token
+Claude Code has refreshed is picked up without restarting the app. Requests use a 30s
+timeout and back off on rate limits and transient errors.
 
 > **Note:** This endpoint is undocumented and may change. It requires Claude Code to be
 > installed and logged in.

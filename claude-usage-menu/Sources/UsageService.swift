@@ -34,7 +34,84 @@ func oauthExpiryDate(fromRawExpiresAt raw: Double) -> Date? {
     return Date(timeIntervalSince1970: seconds)
 }
 
+/// Parses `security find-generic-password -w` output — the credential JSON plus
+/// a trailing newline — into a token. Returns nil on any malformed payload so
+/// the caller can fall back to the direct framework read.
+func oauthTokenFromSecurityCLIOutput(_ data: Data) -> OAuthToken? {
+    var trimmed = data
+    while let last = trimmed.last, last == 0x0A || last == 0x0D { trimmed.removeLast() }
+    guard !trimmed.isEmpty,
+          let creds = try? JSONDecoder().decode(KeychainCredentials.self, from: trimmed) else {
+        return nil
+    }
+    return OAuthToken(
+        accessToken: creds.claudeAiOauth.accessToken,
+        expiresAt: oauthExpiryDate(fromRawExpiresAt: creds.claudeAiOauth.expiresAt)
+    )
+}
+
+/// Reads the credential by spawning `/usr/bin/security find-generic-password -w`.
+///
+/// Claude Code writes the keychain item through that same `security` binary, so
+/// `/usr/bin/security` stays on the item's ACL across Claude Code's ~8h token
+/// rotation — unlike this app's "Always Allow" grant, which every rotation wipes
+/// (the cause of the periodic "Keychain" interruption). Reading through the same
+/// binary therefore succeeds silently, every time, with no access prompt.
+/// (Approach validated against steipete/CodexBar's security-CLI reader.)
+///
+/// Returns nil on any failure (launch error, non-zero exit, timeout, bad JSON);
+/// the caller then falls back to the direct framework read. The bounded wait
+/// guards the one pathological case — `security` blocking on a SecurityAgent
+/// prompt because the binary is unexpectedly NOT trusted for the item — so a
+/// background poll can never hang on an unshowable dialog.
+private func readOAuthTokenViaSecurityCLI(timeout: TimeInterval = 2.0) -> OAuthToken? {
+    let binary = "/usr/bin/security"
+    guard FileManager.default.isExecutableFile(atPath: binary) else { return nil }
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: binary)
+    process.arguments = ["find-generic-password", "-s", "Claude Code-credentials", "-w"]
+    let stdoutPipe = Pipe()
+    process.standardOutput = stdoutPipe
+    process.standardError = Pipe()   // swallow; the exit code is diagnostic enough
+
+    do {
+        try process.run()
+    } catch {
+        diag.notice("security CLI launch failed: \(error.localizedDescription, privacy: .public)")
+        return nil
+    }
+
+    let deadline = Date().addingTimeInterval(timeout)
+    while process.isRunning && Date() < deadline {
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+    if process.isRunning {
+        process.terminate()
+        let killDeadline = Date().addingTimeInterval(0.3)
+        while process.isRunning && Date() < killDeadline {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        diag.notice("security CLI read timed out — falling back to framework read")
+        return nil
+    }
+
+    let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+    guard process.terminationStatus == 0 else {
+        // e.g. 44 = item not found; the framework fallback turns that into the
+        // proper "not signed in" error, so no classification is needed here.
+        diag.notice("security CLI exited \(process.terminationStatus)")
+        return nil
+    }
+    return oauthTokenFromSecurityCLIOutput(data)
+}
+
 /// Reads the Claude Code OAuth token from the Keychain.
+///
+/// Primary path is the `security`-CLI read (see above), which survives Claude
+/// Code's token rotation without prompts. Only when that fails does the direct
+/// `SecItemCopyMatching` read below run, with the original interaction rules:
 ///
 /// `allowInteraction` decides whether macOS may present the access-confirmation
 /// dialog. Background polls pass `false`: Claude Code's ~8h token rotation resets
@@ -46,6 +123,10 @@ func oauthExpiryDate(fromRawExpiresAt raw: Double) -> Date? {
 /// an actionable "Keychain" state. The interactive read then happens only on an
 /// explicit user action, with the app activated, so the dialog reliably appears.
 func readOAuthToken(allowInteraction: Bool) throws -> OAuthToken {
+    if let token = readOAuthTokenViaSecurityCLI() {
+        return token
+    }
+
     // `SecKeychainSetUserInteractionAllowed` is a process-global toggle that the
     // legacy file-based keychain (where this generic-password credential lives)
     // honors for the ACL-confirmation dialog — unlike the modern
@@ -155,12 +236,6 @@ struct OAuthUsageResponse: Decodable {
 }
 
 // MARK: - Utilization helpers (pure, testable)
-
-/// Returns utilization percentage (0–100) given token count and limit.
-func calculateUtilization(tokens: Int, limit: Int) -> Int {
-    guard limit > 0 else { return 0 }
-    return min(100, tokens * 100 / limit)
-}
 
 /// Formats a future date as a human-readable countdown string.
 func formatTimeRemaining(until date: Date, from now: Date = Date()) -> String {
@@ -289,9 +364,13 @@ final class UsageService: ObservableObject {
 
     private func scheduleTimer(interval: TimeInterval) {
         refreshTimer?.invalidate()
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             self?.fetchUsage()
         }
+        // Polling has no precision requirement — let the system coalesce the
+        // wakeup with others to save energy in this always-running app.
+        timer.tolerance = interval * 0.1
+        refreshTimer = timer
     }
 
     /// `forceInteractive` marks an explicit user action (icon click / Refresh):
@@ -315,7 +394,9 @@ final class UsageService: ObservableObject {
                     fiveHourResetAt: response.fiveHour?.resetsAtDate,
                     sevenDayResetAt: response.sevenDay?.resetsAtDate,
                     lastUpdated: Date(),
-                    hasData: true
+                    // A response with every period null carries no usable numbers;
+                    // keep showing "—" rather than presenting a fabricated 0%.
+                    hasData: response.fiveHour != nil || response.sevenDay != nil
                 )
 
                 await MainActor.run {

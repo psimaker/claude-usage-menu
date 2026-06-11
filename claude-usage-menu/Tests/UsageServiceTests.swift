@@ -109,32 +109,37 @@ final class OAuthUsageResponseTests: XCTestCase {
     }
 }
 
-// MARK: - calculateUtilization
+// MARK: - oauthTokenFromSecurityCLIOutput
 
-final class CalculateUtilizationTests: XCTestCase {
+final class SecurityCLIOutputParsingTests: XCTestCase {
 
-    func testZeroTokensIsZeroPercent() {
-        XCTAssertEqual(calculateUtilization(tokens: 0, limit: 100_000), 0)
+    /// Shape of the real credential JSON (extra keys must be tolerated).
+    private let sampleJSON = """
+    {"claudeAiOauth":{"accessToken":"test-token-123","refreshToken":"r","expiresAt":1700000000000,\
+    "scopes":["user:inference"],"subscriptionType":"max","rateLimitTier":"default"}}
+    """
+
+    func testParsesPlainJSON() {
+        let token = oauthTokenFromSecurityCLIOutput(Data(sampleJSON.utf8))
+        XCTAssertEqual(token?.accessToken, "test-token-123")
+        XCTAssertEqual(token?.expiresAt?.timeIntervalSince1970 ?? 0, 1_700_000_000, accuracy: 1)
     }
 
-    func testHalfLimitIsFiftyPercent() {
-        XCTAssertEqual(calculateUtilization(tokens: 50_000, limit: 100_000), 50)
+    func testTrimsTrailingNewline() {
+        // `security find-generic-password -w` terminates its output with \n.
+        let token = oauthTokenFromSecurityCLIOutput(Data((sampleJSON + "\n").utf8))
+        XCTAssertEqual(token?.accessToken, "test-token-123")
     }
 
-    func testExceedingLimitCapsAtHundred() {
-        XCTAssertEqual(calculateUtilization(tokens: 200_000, limit: 100_000), 100)
+    func testTrimsCRLF() {
+        let token = oauthTokenFromSecurityCLIOutput(Data((sampleJSON + "\r\n").utf8))
+        XCTAssertEqual(token?.accessToken, "test-token-123")
     }
 
-    func testExactLimitIsHundredPercent() {
-        XCTAssertEqual(calculateUtilization(tokens: 100_000, limit: 100_000), 100)
-    }
-
-    func testZeroLimitReturnsZero() {
-        XCTAssertEqual(calculateUtilization(tokens: 50_000, limit: 0), 0)
-    }
-
-    func testRoundsDown() {
-        XCTAssertEqual(calculateUtilization(tokens: 1, limit: 3), 33)
+    func testGarbageReturnsNil() {
+        XCTAssertNil(oauthTokenFromSecurityCLIOutput(Data("not json".utf8)))
+        XCTAssertNil(oauthTokenFromSecurityCLIOutput(Data()))
+        XCTAssertNil(oauthTokenFromSecurityCLIOutput(Data("\n".utf8)))
     }
 }
 
