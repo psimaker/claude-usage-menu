@@ -23,4 +23,5 @@ build/
 
 # Release artifacts
 *.zip
+*.dmg
 *.p12

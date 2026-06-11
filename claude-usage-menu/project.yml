@@ -32,7 +32,6 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         COMBINE_HIDPI_IMAGES: YES
-        LSUIElement: YES
     dependencies:
       - sdk: Security.framework
     entitlements:
