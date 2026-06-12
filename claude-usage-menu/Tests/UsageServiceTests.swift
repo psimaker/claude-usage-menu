@@ -109,6 +109,96 @@ final class OAuthUsageResponseTests: XCTestCase {
     }
 }
 
+// MARK: - Extra usage (decode + display mapping)
+
+final class ExtraUsageTests: XCTestCase {
+
+    func testDecodesEnabledExtraUsage() throws {
+        let json = """
+        {
+          "five_hour": { "utilization": 5.0, "resets_at": "2026-06-12T19:00:00+00:00" },
+          "seven_day": { "utilization": 10.0, "resets_at": "2026-06-15T11:00:00+00:00" },
+          "extra_usage": { "is_enabled": true, "monthly_limit": 200000,
+                           "used_credits": 12345, "utilization": 6.2, "currency": "USD" }
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(OAuthUsageResponse.self, from: json)
+
+        XCTAssertEqual(response.extraUsage?.isEnabled, true)
+        XCTAssertEqual(response.extraUsage?.monthlyLimit, 200_000)
+        XCTAssertEqual(response.extraUsage?.usedCredits, 12_345)
+    }
+
+    func testMapsCentsToDollars() {
+        let extra = OAuthUsageResponse.ExtraUsage(
+            isEnabled: true, monthlyLimit: 200_000, usedCredits: 12_345,
+            utilization: 6.2, currency: "USD")
+
+        let snapshot = extraUsageSnapshot(from: extra)
+
+        XCTAssertEqual(snapshot?.usedDollars ?? 0, 123.45, accuracy: 0.001)
+        XCTAssertEqual(snapshot?.limitDollars ?? 0, 2000.0, accuracy: 0.001)
+        XCTAssertEqual(snapshot?.utilization, 6)
+        XCTAssertEqual(snapshot?.currencyCode, "USD")
+    }
+
+    func testDisabledMapsToNil() {
+        // The live API returns this exact shape for accounts without extra usage.
+        let extra = OAuthUsageResponse.ExtraUsage(
+            isEnabled: false, monthlyLimit: nil, usedCredits: nil,
+            utilization: nil, currency: nil)
+        XCTAssertNil(extraUsageSnapshot(from: extra))
+        XCTAssertNil(extraUsageSnapshot(from: nil))
+    }
+
+    func testEnabledWithoutAmountsMapsToNil() {
+        let extra = OAuthUsageResponse.ExtraUsage(
+            isEnabled: true, monthlyLimit: nil, usedCredits: 100,
+            utilization: nil, currency: nil)
+        XCTAssertNil(extraUsageSnapshot(from: extra))
+    }
+
+    func testUtilizationFallsBackToComputedPercent() {
+        let extra = OAuthUsageResponse.ExtraUsage(
+            isEnabled: true, monthlyLimit: 200_000, usedCredits: 50_000,
+            utilization: nil, currency: nil)
+
+        let snapshot = extraUsageSnapshot(from: extra)
+
+        XCTAssertEqual(snapshot?.utilization, 25)
+        XCTAssertEqual(snapshot?.currencyCode, "USD", "missing currency defaults to USD")
+    }
+
+    func testCurrencyFormatting() {
+        XCTAssertEqual(formatCurrencyAmount(0, code: "USD"), "$0.00")
+        XCTAssertEqual(formatCurrencyAmount(123.45, code: "USD"), "$123.45")
+        XCTAssertEqual(formatCurrencyAmount(2000, code: "USD"), "$2,000.00")
+        XCTAssertEqual(formatCurrencyAmount(12.5, code: "EUR"), "EUR 12.50")
+    }
+}
+
+// MARK: - displayPlanName
+
+final class DisplayPlanNameTests: XCTestCase {
+
+    func testCapitalizesKnownPlans() {
+        XCTAssertEqual(displayPlanName("max"), "Max")
+        XCTAssertEqual(displayPlanName("pro"), "Pro")
+        XCTAssertEqual(displayPlanName("enterprise"), "Enterprise")
+    }
+
+    func testNormalizesWhitespaceAndCase() {
+        XCTAssertEqual(displayPlanName(" MAX "), "Max")
+    }
+
+    func testAbsentOrEmptyReturnsNil() {
+        XCTAssertNil(displayPlanName(nil))
+        XCTAssertNil(displayPlanName(""))
+        XCTAssertNil(displayPlanName("   "))
+    }
+}
+
 // MARK: - oauthTokenFromSecurityCLIOutput
 
 final class SecurityCLIOutputParsingTests: XCTestCase {
@@ -123,6 +213,7 @@ final class SecurityCLIOutputParsingTests: XCTestCase {
         let token = oauthTokenFromSecurityCLIOutput(Data(sampleJSON.utf8))
         XCTAssertEqual(token?.accessToken, "test-token-123")
         XCTAssertEqual(token?.expiresAt?.timeIntervalSince1970 ?? 0, 1_700_000_000, accuracy: 1)
+        XCTAssertEqual(token?.subscriptionType, "max")
     }
 
     func testTrimsTrailingNewline() {

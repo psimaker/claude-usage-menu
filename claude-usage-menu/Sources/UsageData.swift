@@ -5,7 +5,7 @@ struct AppSettings: Codable, Equatable {
     var criticalThreshold: Double = 90.0
     var notificationsEnabled: Bool = true
     /// When true the menu bar shows a tight inline `45% · 78%`.
-    /// When false (default) it shows the labeled two-column "5h Limit / Weekly Limit" layout.
+    /// When false (default) it shows the labeled two-column "Session / Weekly" layout.
     var compactDisplay: Bool = false
 
     /// The sliders allow critical to be set below warning. Color logic checks
@@ -37,6 +37,15 @@ func usageLevel(percent: Int, warning: Int, critical: Int) -> UsageLevel {
 /// a server value above 100 (over quota) never renders as a nonsensical "105%".
 func displayPercent(_ raw: Int) -> Int { min(max(raw, 0), 100) }
 
+/// Extra-usage state (pay-as-you-go credits beyond the plan limits), already
+/// normalized for display: the API reports the amounts in cents.
+struct ExtraUsageSnapshot: Equatable {
+    let usedDollars: Double
+    let limitDollars: Double
+    let utilization: Int
+    let currencyCode: String
+}
+
 /// A point-in-time view of the account's usage limits.
 ///
 /// `hasData` is false for the initial placeholder shown before the first
@@ -47,6 +56,7 @@ struct UsageSnapshot {
     let sevenDaySonnetUtilization: Int?
     let fiveHourResetAt: Date?
     let sevenDayResetAt: Date?
+    let extraUsage: ExtraUsageSnapshot?
     let lastUpdated: Date
     let hasData: Bool
 
@@ -57,10 +67,41 @@ struct UsageSnapshot {
             sevenDaySonnetUtilization: nil,
             fiveHourResetAt: nil,
             sevenDayResetAt: nil,
+            extraUsage: nil,
             lastUpdated: Date(),
             hasData: false
         )
     }
+}
+
+// MARK: - Display formatting helpers (pure, testable)
+
+private let currencyAmountFormatter: NumberFormatter = {
+    let f = NumberFormatter()
+    // Fixed POSIX locale: the popover shows the API's USD amounts in the same
+    // "$2,000.00" form CodexBar uses, independent of the user's region format.
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.numberStyle = .decimal
+    f.minimumFractionDigits = 2
+    f.maximumFractionDigits = 2
+    f.usesGroupingSeparator = true
+    return f
+}()
+
+/// Formats an extra-usage amount for the popover, e.g. "$2,000.00".
+/// Non-USD currencies fall back to a "CODE amount" prefix form.
+func formatCurrencyAmount(_ amount: Double, code: String) -> String {
+    let number = currencyAmountFormatter.string(from: NSNumber(value: amount))
+        ?? String(format: "%.2f", amount)
+    return code == "USD" ? "$\(number)" : "\(code) \(number)"
+}
+
+/// Maps Claude Code's raw `subscriptionType` ("max", "pro", …) to the plan
+/// badge shown in the popover header, or nil when unknown/absent.
+func displayPlanName(_ raw: String?) -> String? {
+    guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+          !trimmed.isEmpty else { return nil }
+    return trimmed.prefix(1).uppercased() + trimmed.dropFirst()
 }
 
 // MARK: - Usage alert evaluation (pure, testable)

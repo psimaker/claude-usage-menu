@@ -5,7 +5,6 @@ import ServiceManagement
 
 struct SettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
-    @ObservedObject var usageService: UsageService
 
     // Live slider positions, persisted on every value change via commitWarning/
     // commitCritical (so keyboard and VoiceOver adjustments are saved too, not
@@ -26,17 +25,17 @@ struct SettingsView: View {
             header
 
             Form {
-                authSection
                 generalSection
                 menuBarSection
                 notificationsSection
+                thresholdsSection
             }
             .formStyle(.grouped)
 
             footer
         }
-        .frame(width: 380)
-        .frame(minHeight: 420)
+        .frame(width: 400)
+        .frame(minHeight: 460)
         .onAppear {
             warningEdit = settings.warningThreshold
             criticalEdit = settings.criticalThreshold
@@ -52,37 +51,54 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Sections
+    // MARK: Header
 
-    private var authSection: some View {
-        Section("Auth") {
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: authIcon)
-                    .foregroundColor(authColor)
-                // Wrap rather than truncate: the .unknown failure case shows the
-                // actual error message here, which can be long.
-                Text(authText)
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 40, height: 40)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Claude Usage Menu")
+                    .font(.headline)
+                Text(appVersion)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
-                Text(authBadge)
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(authColor.opacity(0.18))
-                    .cornerRadius(4)
             }
-            .accessibilityElement(children: .combine)
+
+            Spacer()
+
+            Button(action: openRepository) {
+                Image("GitHubMark")
+                    .renderingMode(.template)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+                    .foregroundColor(repoHovered ? .accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .onHover { repoHovered = $0 }
+            .help("View this project on GitHub")
+            .accessibilityLabel("View this project on GitHub")
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color(NSColor.controlBackgroundColor))
     }
 
+    // MARK: Sections
+
     private var generalSection: some View {
-        Section("General") {
+        Section {
             Toggle("Launch at login", isOn: Binding(
                 get: { launchAtLogin },
                 set: { setLaunchAtLogin($0) }
             ))
+        } header: {
+            Text("General")
+        } footer: {
             Text("Start Claude Usage Menu automatically when you log in.")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -90,25 +106,29 @@ struct SettingsView: View {
     }
 
     private var menuBarSection: some View {
-        Section("Menu Bar") {
-            Toggle("Compact mode (45% · 78%)", isOn: binding(\.compactDisplay))
+        Section {
+            Picker("Display", selection: binding(\.compactDisplay)) {
+                Text("Labeled").tag(false)
+                Text("Compact").tag(true)
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Menu Bar")
+        } footer: {
             Text(settings.compactDisplay
-                 ? "Both percentages shown inline."
-                 : "Labeled “5h Limit” and “Weekly Limit” columns.")
+                 ? "Both percentages inline: 45% · 78%."
+                 : "Labeled “Session” and “Weekly” columns with the reset countdown.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
     }
 
     private var notificationsSection: some View {
-        Section("Notifications") {
-            Toggle("Enable usage alerts", isOn: binding(\.notificationsEnabled))
+        Section {
+            Toggle("Usage alerts", isOn: binding(\.notificationsEnabled))
                 .onChange(of: settings.notificationsEnabled) { enabled in
                     if enabled { ensureNotificationAuthorization() }
                 }
-            Text("Notifies when weekly usage crosses a threshold (once per period).")
-                .font(.caption)
-                .foregroundColor(.secondary)
 
             if settings.notificationsEnabled && notifAuthStatus == .denied {
                 HStack(spacing: 6) {
@@ -123,66 +143,68 @@ struct SettingsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("Notifies when weekly usage crosses a threshold (once per period).")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
 
-            VStack(alignment: .leading) {
-                Text("Warning threshold: \(Int(warningEdit))%")
+    private var thresholdsSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Warning")
+                    Spacer()
+                    Text("\(Int(warningEdit))%")
+                        .monospacedDigit()
+                        .foregroundColor(.orange)
+                }
                 // Persist on every value change (not just drag-end) so keyboard
                 // and VoiceOver adjustments are saved too. commitWarning() also
                 // clamps live, keeping the two labels consistent mid-drag.
                 Slider(value: $warningEdit, in: 50...95, step: 5)
                     .onChange(of: warningEdit) { _ in commitWarning() }
+                    .accessibilityLabel("Warning threshold")
                     .accessibilityValue("\(Int(warningEdit)) percent")
             }
 
-            VStack(alignment: .leading) {
-                Text("Critical threshold: \(Int(criticalEdit))%")
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Critical")
+                    Spacer()
+                    Text("\(Int(criticalEdit))%")
+                        .monospacedDigit()
+                        .foregroundColor(.red)
+                }
                 Slider(value: $criticalEdit, in: 60...100, step: 5)
                     .onChange(of: criticalEdit) { _ in commitCritical() }
+                    .accessibilityLabel("Critical threshold")
                     .accessibilityValue("\(Int(criticalEdit)) percent")
             }
+        } header: {
+            Text("Thresholds")
+        } footer: {
+            Text("Colors the menu bar and popup orange/red, and sets when alerts fire.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            Button(action: openRepository) {
-                Image("GitHubMark")
-                    .renderingMode(.template)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 22, height: 22)
-                    .foregroundColor(repoHovered ? .accentColor : .primary)
-            }
-            .buttonStyle(.plain)
-            .onHover { repoHovered = $0 }
-            .help("View this project on GitHub")
-            .accessibilityLabel("View this project on GitHub")
-
-            Text("Claude Usage Menu")
-                .font(.headline)
-            Spacer()
-        }
-        .padding()
-        .background(Color(NSColor.controlBackgroundColor))
     }
 
     private var footer: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Data from claude.ai OAuth")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(appVersion)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
+            Text("Data from claude.ai OAuth")
+                .font(.caption)
+                .foregroundColor(.secondary)
             Spacer()
             Button("Reset to Defaults", role: .destructive) { resetToDefaults() }
                 .buttonStyle(.borderless)
                 .foregroundColor(.red)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .background(Color(NSColor.controlBackgroundColor))
     }
 
@@ -191,52 +213,6 @@ struct SettingsView: View {
         let version = info?["CFBundleShortVersionString"] as? String ?? "—"
         let build = info?["CFBundleVersion"] as? String ?? ""
         return build.isEmpty ? "Version \(version)" : "Version \(version) (\(build))"
-    }
-
-    // MARK: Auth row state
-
-    // When the auth state is still .unknown but a fetch has already failed, the
-    // row reflects that failure instead of claiming an in-progress check forever.
-    private var authUnknownFailed: Bool {
-        usageService.authState == .unknown && usageService.error != nil
-    }
-
-    private var authIcon: String {
-        switch usageService.authState {
-        case .ok: return "lock.fill"
-        case .unknown: return authUnknownFailed ? "exclamationmark.triangle.fill" : "lock.fill"
-        case .signedOut: return "lock.slash.fill"
-        case .expired: return "exclamationmark.triangle.fill"
-        }
-    }
-
-    private var authColor: Color {
-        switch usageService.authState {
-        case .ok: return .green
-        case .unknown: return authUnknownFailed ? .orange : .secondary
-        case .signedOut: return .red
-        case .expired: return .orange
-        }
-    }
-
-    private var authText: String {
-        switch usageService.authState {
-        case .ok: return "Using Claude Code OAuth token"
-        case .unknown:
-            if let err = usageService.error { return "Can't verify credentials — \(err)" }
-            return "Checking Claude Code credentials…"
-        case .signedOut: return "Not signed in — open Claude Code and log in"
-        case .expired: return "Sign-in expired — refreshing credentials"
-        }
-    }
-
-    private var authBadge: String {
-        switch usageService.authState {
-        case .ok: return "Auto"
-        case .unknown: return authUnknownFailed ? "?" : "…"
-        case .signedOut: return "Signed out"
-        case .expired: return "Expired"
-        }
     }
 
     // MARK: Bindings & commits
