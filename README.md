@@ -1,9 +1,10 @@
 # Claude Usage Menu
 
 A lightweight macOS menu bar app that shows your [Claude.ai](https://claude.ai) plan
-usage in real time — current session and weekly limits — without opening a browser.
+usage in real time — session, weekly, Sonnet and extra-usage spend — without opening
+a browser.
 
-<img src="docs/screenshot.png" alt="Claude Usage Menu" width="679">
+<img src="docs/screenshot.png" alt="Claude Usage Menu" width="555">
 
 
 > **Credits / origin:** This project began as a fork of
@@ -19,12 +20,14 @@ Mirrors the data on `claude.ai/settings/usage`:
 
 | Metric | Description |
 |--------|-------------|
-| **5h** | Current session usage (resets every ~5 hours) |
-| **7d** | Weekly all-models usage |
+| **Session** | Current session usage (resets every ~5 hours) |
+| **Weekly** | Weekly all-models usage |
 | **Sonnet** | Weekly Sonnet-only usage (shown in the popover) |
+| **Extra usage** | Pay-as-you-go spend this month, e.g. `$0.54 / $100.00` (only when enabled on your account) |
 
-The menu bar values turn orange/red as they cross your configured
-warning/critical thresholds.
+The popover header also shows your plan (Pro/Max) and when the data was last
+updated. Menu bar and popover values turn orange/red as they cross your
+configured warning/critical thresholds.
 
 ## Requirements
 
@@ -51,16 +54,19 @@ it, and move **`claude-usage-menu.app`** to `/Applications`.
 
 ## Usage
 
-The app lives in the menu bar (it has no Dock icon). Click the menu bar item to open a
-popover with the full breakdown (5h, 7d, and weekly Sonnet) and a link to open the
-settings window.
+The app lives in the menu bar (it has no Dock icon). Click the menu bar item to open
+the popover: one section per metric (Session, Weekly, Sonnet, Extra usage), each with
+a progress bar, the percentage used, and its reset countdown — followed by quick
+actions: **Open Dashboard**, **Refresh**, **Settings…**, **About Claude Usage Menu**,
+and **Quit**.
 
 ### Display modes
 
-Toggle **Compact mode** in Settings to switch between:
+Switch **Display** in Settings → Menu Bar between:
 
-- **Labeled (default):** a two-column layout — `5h Limit` with its percentage on the
-  left and `Weekly Limit` with its percentage on the right, each colored by threshold.
+- **Labeled (default):** a two-column layout — the session reset countdown over its
+  percentage on the left, `Weekly` over its percentage on the right, each colored by
+  threshold.
 - **Compact:** `35% · 71%` — both percentages inline, for tight menu bars.
 
 Both adapt to light/dark menu bars. Before the first successful fetch (or while signed
@@ -71,13 +77,13 @@ out) the values show `—` and the tooltip explains why.
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Launch at login | Off | Start the app automatically when you log in (uses `SMAppService`) |
-| Compact mode | Off | On = inline `5h% · 7d%`; Off = labeled two-column layout |
+| Display | Labeled | Labeled two-column menu bar layout, or compact inline `35% · 71%` |
+| Usage alerts | On | macOS notification when weekly usage crosses a threshold (once per period) |
 | Warning threshold | 80% | Percentage above which values turn orange |
 | Critical threshold | 90% | Percentage above which values turn red |
-| Usage alerts | On | macOS notification when weekly usage crosses a threshold (once per period) |
 
-The Settings window also shows the current sign-in/auth state and a GitHub link to
-this repository in its header.
+The Settings window header shows the app icon, version, and a GitHub link to this
+repository.
 
 ## How it works
 
@@ -90,6 +96,10 @@ GET https://api.anthropic.com/api/oauth/usage
 Authorization: Bearer <oauth_token>
 anthropic-beta: oauth-2025-04-20
 ```
+
+The same response carries the extra-usage block (amounts in cents, converted for
+display); the plan badge (Pro/Max) is read from the same Keychain credential as the
+token.
 
 The credential is read through the `security` CLI (`/usr/bin/security
 find-generic-password`) — the same binary Claude Code itself uses to write it — so the
