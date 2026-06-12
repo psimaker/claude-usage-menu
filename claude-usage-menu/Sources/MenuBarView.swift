@@ -6,11 +6,13 @@ struct MenuBarView: View {
     @ObservedObject var settingsManager: SettingsManager
     /// Opens the standalone Settings window (owned by AppDelegate).
     var openSettings: () -> Void = {}
+    /// Opens the standalone About window (owned by AppDelegate).
+    var openAbout: () -> Void = {}
     /// Dismisses the popover (owned by AppDelegate).
     var dismiss: () -> Void = {}
     @State private var now = Date()
 
-    // Drives the live "resets in …" / "updated … ago" countdowns. It's a
+    // Drives the live "Resets in …" / "Updated … ago" countdowns. It's a
     // connectable publisher (no autoconnect) started only while the popover is
     // on screen, so a closed popover doesn't wake every 15s for nothing.
     private let ticker = Timer.publish(every: 15, on: .main, in: .common)
@@ -18,20 +20,32 @@ struct MenuBarView: View {
 
     private var snapshot: UsageSnapshot { usageService.currentUsage }
 
+    /// Claude's brand terracotta, used as the normal-state bar fill so the card
+    /// reads like CodexBar's Claude card. Warning/critical override it.
+    private static let claudeTint = Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            usageSection
+            header
+                .padding(.horizontal, 14)
 
-            Divider().padding(.vertical, 4)
+            sectionDivider
+
+            usageSection
+                .padding(.horizontal, 14)
+
+            sectionDivider
 
             actionButtons
 
-            Divider().padding(.vertical, 4)
+            Divider()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 4)
 
             MenuRow(icon: "power", title: "Quit", action: quitApp)
         }
-        .padding(.vertical, 8)
-        .frame(width: 260)
+        .padding(.vertical, 10)
+        .frame(width: 300)
         .onReceive(ticker) { now = $0 }
         .onAppear {
             now = Date()
@@ -43,49 +57,81 @@ struct MenuBarView: View {
         }
     }
 
+    private var sectionDivider: some View {
+        Divider()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Claude")
+                .font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text(updatedLine)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if let plan = usageService.planName {
+                    Text(plan)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var updatedLine: String {
+        if snapshot.hasData { return "Updated \(relativeUpdated)" }
+        return usageService.isLoading ? "Loading…" : "No data yet"
+    }
+
     // MARK: Usage
 
     private var usageSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            limitRow(icon: "clock", title: "5h Limit",
-                     percent: snapshot.fiveHourUtilization,
-                     resetAt: snapshot.fiveHourResetAt)
+        VStack(alignment: .leading, spacing: 14) {
+            metricSection(title: "Session",
+                          percent: snapshot.fiveHourUtilization,
+                          resetAt: snapshot.fiveHourResetAt)
 
-            limitRow(icon: "calendar", title: "Weekly Limit",
-                     percent: snapshot.sevenDayUtilization,
-                     resetAt: snapshot.sevenDayResetAt)
+            metricSection(title: "Weekly",
+                          percent: snapshot.sevenDayUtilization,
+                          resetAt: snapshot.sevenDayResetAt)
 
             if let sonnet = snapshot.sevenDaySonnetUtilization {
-                HStack(spacing: 6) {
-                    Image(systemName: "cpu").font(.caption2).foregroundColor(.blue)
-                        .accessibilityHidden(true)
-                    Text("Sonnet (weekly)").font(.caption).foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(displayPercent(sonnet))%").font(.caption).monospacedDigit().foregroundColor(.secondary)
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Sonnet weekly usage")
-                .accessibilityValue("\(displayPercent(sonnet)) percent used")
+                // The API reports no per-window reset for the Sonnet share, so
+                // the row carries the percentage only (CodexBar does the same).
+                metricSection(title: "Sonnet", percent: sonnet, resetAt: nil)
+            }
+
+            if let extra = snapshot.extraUsage {
+                extraUsageSection(extra)
             }
 
             if showsStatusLine {
                 statusLine
             }
         }
-        .padding(.horizontal, 12)
     }
 
-    private func limitRow(icon: String, title: String, percent: Int, resetAt: Date?) -> some View {
+    /// One CodexBar-style metric block: bold title, thin bar, then a footnote
+    /// line with "N% used" left and the reset countdown right.
+    private func metricSection(title: String, percent: Int, resetAt: Date?) -> some View {
         let hasData = snapshot.hasData
         let shown = displayPercent(percent)
-        let level = self.level(percent)
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundColor(hasData ? color(for: level) : .secondary)
-                    .font(.system(size: 12))
-                Text(title).fontWeight(.medium)
-                Spacer()
+        let level = self.level(shown)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.body)
+                .fontWeight(.medium)
+
+            UsageBar(percent: hasData ? Double(shown) : 0,
+                     tint: hasData ? barTint(for: level) : .secondary)
+
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 // Redundant, non-color cue for warning/critical so the state is
                 // distinguishable without relying on color alone.
                 if hasData, let symbol = levelSymbol(level) {
@@ -93,32 +139,53 @@ struct MenuBarView: View {
                         .font(.caption2)
                         .foregroundColor(color(for: level))
                 }
-                Text(hasData ? "\(shown)%" : "—")
-                    .fontWeight(.semibold)
+                Text(hasData ? "\(shown)% used" : "—")
+                    .font(.footnote)
                     .monospacedDigit()
-                    .foregroundColor(hasData ? color(for: level) : .secondary)
-            }
-
-            ProgressView(value: hasData ? Double(shown) : 0, total: 100)
-                .progressViewStyle(.linear)
-                .tint(hasData ? color(for: level) : .secondary)
-
-            if hasData, let resetAt = resetAt {
-                Text(resetCaption(until: resetAt, from: now))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(level == .normal ? .primary : color(for: level))
+                Spacer()
+                if hasData, let resetAt {
+                    Text(resetCaption(until: resetAt, from: now).capitalizedFirst)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        // Announce each row as one VoiceOver element with the full state, since
-        // a bare ProgressView would otherwise read as context-less progress.
+        // Announce each block as one VoiceOver element with the full state,
+        // since a bare bar would otherwise read as context-less progress.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title)
         .accessibilityValue(rowAccessibilityValue(hasData: hasData, percent: shown, level: level, resetAt: resetAt))
     }
 
-    // The status line now only carries the error and first-load states; the
-    // success "Updated …" timestamp moved to the Refresh row (refreshTrailing),
-    // so it collapses entirely once data has loaded successfully.
+    private func extraUsageSection(_ extra: ExtraUsageSnapshot) -> some View {
+        let shown = displayPercent(extra.utilization)
+        let used = formatCurrencyAmount(extra.usedDollars, code: extra.currencyCode)
+        let limit = formatCurrencyAmount(extra.limitDollars, code: extra.currencyCode)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Extra usage")
+                .font(.body)
+                .fontWeight(.medium)
+
+            UsageBar(percent: Double(shown), tint: Self.claudeTint)
+
+            HStack(alignment: .firstTextBaseline) {
+                Text("This month: \(used) / \(limit)")
+                    .font(.footnote)
+                Spacer()
+                Text("\(shown)% used")
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Extra usage")
+        .accessibilityValue("\(used) of \(limit) spent this month, \(shown) percent used")
+    }
+
+    // The status line only carries the error and first-load states; the
+    // success "Updated …" timestamp lives in the header.
     private var showsStatusLine: Bool {
         usageService.error != nil || (usageService.isLoading && !snapshot.hasData)
     }
@@ -149,21 +216,18 @@ struct MenuBarView: View {
         VStack(spacing: 0) {
             MenuRow(icon: "chart.bar", title: "Open Dashboard", action: openDashboard)
             // Refresh stays a normal, always-tappable row (single-flight makes a
-            // tap during an in-flight fetch a safe no-op). Its trailing edge shows
-            // a spinner while refreshing, otherwise the grey "Updated …" timestamp.
+            // tap during an in-flight fetch a safe no-op). Its trailing edge
+            // shows a spinner while a refresh is running.
             MenuRow(icon: "arrow.clockwise", title: "Refresh",
                     trailing: AnyView(refreshTrailing), action: refreshUsage)
-            MenuRow(icon: "gear", title: "Settings", action: openSettings)
+            MenuRow(icon: "gear", title: "Settings…", action: openSettings)
+            MenuRow(icon: "info.circle", title: "About Claude Usage Menu", action: openAbout)
         }
     }
 
     @ViewBuilder private var refreshTrailing: some View {
         if usageService.isLoading && snapshot.hasData {
             ProgressView().controlSize(.small)
-        } else if snapshot.hasData && usageService.error == nil {
-            Text("Updated \(relativeUpdated)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
         }
     }
 
@@ -173,6 +237,14 @@ struct MenuBarView: View {
         usageLevel(percent: percent,
                    warning: Int(settingsManager.settings.effectiveWarningThreshold),
                    critical: Int(settingsManager.settings.effectiveCriticalThreshold))
+    }
+
+    private func barTint(for level: UsageLevel) -> Color {
+        switch level {
+        case .critical: return .red
+        case .warning: return .orange
+        case .normal: return Self.claudeTint
+        }
     }
 
     private func color(for level: UsageLevel) -> Color {
@@ -229,6 +301,44 @@ struct MenuBarView: View {
 
     private func quitApp() {
         NSApplication.shared.terminate(nil)
+    }
+}
+
+private extension String {
+    /// "resets in 3h 53m" → "Resets in 3h 53m" for the CodexBar-style captions.
+    var capitalizedFirst: String {
+        guard let first = first else { return self }
+        return first.uppercased() + dropFirst()
+    }
+}
+
+// MARK: - Usage bar
+
+/// Thin rounded progress bar (track + fill) drawn in a single Canvas, modeled
+/// on CodexBar's UsageProgressBar.
+private struct UsageBar: View {
+    let percent: Double
+    let tint: Color
+
+    var body: some View {
+        Canvas { context, size in
+            let clamped = min(100, max(0, percent))
+            let radius = size.height / 2
+            let cornerSize = CGSize(width: radius, height: radius)
+
+            let track = Path { $0.addRoundedRect(in: CGRect(origin: .zero, size: size), cornerSize: cornerSize) }
+            context.fill(track, with: .color(Color(nsColor: .tertiaryLabelColor).opacity(0.5)))
+
+            let fillWidth = size.width * clamped / 100
+            if fillWidth > 0 {
+                let fillRect = CGRect(x: 0, y: 0, width: min(fillWidth, size.width), height: size.height)
+                let fill = Path { $0.addRoundedRect(in: fillRect, cornerSize: cornerSize) }
+                context.fill(fill, with: .color(tint))
+            }
+        }
+        .frame(height: 6)
+        // The enclosing metric row exposes the combined VoiceOver value.
+        .accessibilityHidden(true)
     }
 }
 

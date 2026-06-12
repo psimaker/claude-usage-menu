@@ -16,13 +16,16 @@ private struct KeychainCredentials: Decodable {
     struct OAuthData: Decodable {
         let accessToken: String
         let expiresAt: Double
+        let subscriptionType: String?
     }
 }
 
-/// A token read from the Claude Code Keychain entry, with its expiry (if known).
+/// A token read from the Claude Code Keychain entry, with its expiry (if known)
+/// and the account's plan ("max", "pro", …) for the popover header badge.
 struct OAuthToken {
     let accessToken: String
     let expiresAt: Date?
+    let subscriptionType: String?
 }
 
 /// Interprets the Keychain `expires_at` value, which Claude Code stores as a
@@ -46,7 +49,8 @@ func oauthTokenFromSecurityCLIOutput(_ data: Data) -> OAuthToken? {
     }
     return OAuthToken(
         accessToken: creds.claudeAiOauth.accessToken,
-        expiresAt: oauthExpiryDate(fromRawExpiresAt: creds.claudeAiOauth.expiresAt)
+        expiresAt: oauthExpiryDate(fromRawExpiresAt: creds.claudeAiOauth.expiresAt),
+        subscriptionType: creds.claudeAiOauth.subscriptionType
     )
 }
 
@@ -153,7 +157,8 @@ func readOAuthToken(allowInteraction: Bool) throws -> OAuthToken {
     let creds = try JSONDecoder().decode(KeychainCredentials.self, from: data)
     return OAuthToken(
         accessToken: creds.claudeAiOauth.accessToken,
-        expiresAt: oauthExpiryDate(fromRawExpiresAt: creds.claudeAiOauth.expiresAt)
+        expiresAt: oauthExpiryDate(fromRawExpiresAt: creds.claudeAiOauth.expiresAt),
+        subscriptionType: creds.claudeAiOauth.subscriptionType
     )
 }
 
@@ -212,11 +217,13 @@ struct OAuthUsageResponse: Decodable {
     let fiveHour: UsagePeriod?
     let sevenDay: UsagePeriod?
     let sevenDaySonnet: UsagePeriod?
+    let extraUsage: ExtraUsage?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
         case sevenDay = "seven_day"
         case sevenDaySonnet = "seven_day_sonnet"
+        case extraUsage = "extra_usage"
     }
 
     struct UsagePeriod: Decodable {
@@ -233,6 +240,42 @@ struct OAuthUsageResponse: Decodable {
             return parseISO8601Date(resetsAt)
         }
     }
+
+    /// The pay-as-you-go "extra usage" block. Every field is optional because a
+    /// disabled account returns `{"is_enabled": false, "monthly_limit": null, …}`.
+    struct ExtraUsage: Decodable {
+        let isEnabled: Bool?
+        let monthlyLimit: Double?
+        let usedCredits: Double?
+        let utilization: Double?
+        let currency: String?
+
+        enum CodingKeys: String, CodingKey {
+            case isEnabled = "is_enabled"
+            case monthlyLimit = "monthly_limit"
+            case usedCredits = "used_credits"
+            case utilization
+            case currency
+        }
+    }
+}
+
+/// Maps the API's `extra_usage` block to a display snapshot, or nil when the
+/// feature is disabled or the amounts are absent (the popover section then
+/// disappears entirely). The API reports amounts in cents (minor units) — same
+/// as the claude.ai web API — so they are converted to dollars here.
+func extraUsageSnapshot(from extra: OAuthUsageResponse.ExtraUsage?) -> ExtraUsageSnapshot? {
+    guard let extra, extra.isEnabled == true,
+          let usedCents = extra.usedCredits,
+          let limitCents = extra.monthlyLimit, limitCents > 0 else { return nil }
+    let percent = extra.utilization ?? (usedCents / limitCents) * 100
+    let currency = extra.currency?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return ExtraUsageSnapshot(
+        usedDollars: usedCents / 100,
+        limitDollars: limitCents / 100,
+        utilization: Int(percent),
+        currencyCode: currency.isEmpty ? "USD" : currency
+    )
 }
 
 // MARK: - Utilization helpers (pure, testable)
@@ -283,6 +326,9 @@ final class UsageService: ObservableObject {
     /// rotation). Distinct from a sign-out and recoverable with one click, so
     /// the menu bar surfaces it as an actionable "Keychain" state, not "stale".
     @Published private(set) var needsKeychainAccess: Bool = false
+    /// The account's plan badge ("Max", "Pro", …) for the popover header,
+    /// read from the same Keychain credential as the token.
+    @Published private(set) var planName: String?
 
     private var refreshTimer: Timer?
     private let normalInterval: TimeInterval = 5 * 60    // 5 minutes
@@ -310,6 +356,7 @@ final class UsageService: ObservableObject {
     private let tokenLock = NSLock()
     private var cachedToken: String?
     private var tokenExpiresAt: Date?
+    private var cachedPlan: String?
 
     private init() {}
 
@@ -342,6 +389,7 @@ final class UsageService: ObservableObject {
         tokenLock.lock()
         cachedToken = creds.accessToken
         tokenExpiresAt = creds.expiresAt
+        cachedPlan = creds.subscriptionType
         tokenLock.unlock()
         return creds.accessToken
     }
@@ -351,6 +399,14 @@ final class UsageService: ObservableObject {
         cachedToken = nil
         tokenExpiresAt = nil
         tokenLock.unlock()
+    }
+
+    /// Synchronous accessor so async contexts never touch `tokenLock` directly
+    /// (NSLock lock/unlock is unavailable from async code in Swift 6).
+    private func lastReadPlan() -> String? {
+        tokenLock.lock()
+        defer { tokenLock.unlock() }
+        return cachedPlan
     }
 
     func startPolling() {
@@ -393,14 +449,18 @@ final class UsageService: ObservableObject {
                     sevenDaySonnetUtilization: response.sevenDaySonnet.map { Int($0.utilization) },
                     fiveHourResetAt: response.fiveHour?.resetsAtDate,
                     sevenDayResetAt: response.sevenDay?.resetsAtDate,
+                    extraUsage: extraUsageSnapshot(from: response.extraUsage),
                     lastUpdated: Date(),
                     // A response with every period null carries no usable numbers;
                     // keep showing "—" rather than presenting a fabricated 0%.
                     hasData: response.fiveHour != nil || response.sevenDay != nil
                 )
 
+                let plan = self.lastReadPlan()
+
                 await MainActor.run {
                     self.currentUsage = snapshot
+                    self.planName = displayPlanName(plan)
                     self.error = nil
                     self.needsKeychainAccess = false
                     self.authState = .ok

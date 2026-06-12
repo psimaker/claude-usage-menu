@@ -117,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var settingsWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     private let usageService = UsageService.shared
     private let settingsManager = SettingsManager.shared
 
@@ -187,7 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func setupPopover() {
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 260, height: 220)
+        popover.contentSize = NSSize(width: 300, height: 480)
         popover.behavior = .transient
         // Honor the system Reduce Motion accessibility setting.
         popover.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -198,6 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 usageService: usageService,
                 settingsManager: settingsManager,
                 openSettings: { [weak self] in self?.openSettings() },
+                openAbout: { [weak self] in self?.openAbout() },
                 dismiss: { [weak self] in self?.closePopover() }
             )
         )
@@ -335,7 +337,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // lets the window grow to fit conditional rows (e.g. the "notifications
         // blocked" warning). Both APIs are available on the 13.0 target.
         let hosting = NSHostingController(
-            rootView: SettingsView(settingsManager: settingsManager, usageService: usageService)
+            rootView: SettingsView(settingsManager: settingsManager)
         )
         hosting.sizingOptions = [.preferredContentSize]
 
@@ -354,6 +356,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // window reliably comes forward and can take focus.
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: About window
+
+    /// Presents the About panel in its own retained window, decoupled from the
+    /// transient popover for the same lifetime reasons as the Settings window.
+    func openAbout() {
+        closePopover()
+
+        if aboutWindow == nil {
+            let hosting = NSHostingController(rootView: AboutView())
+            let window = NSWindow(contentViewController: hosting)
+            window.title = "About Claude Usage Menu"
+            window.styleMask = [.titled, .closable]
+            window.isReleasedWhenClosed = false   // we retain & reuse it
+            window.center()
+            aboutWindow = window
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        aboutWindow?.makeKeyAndOrderFront(nil)
     }
 
     // MARK: Menu bar appearance
@@ -423,7 +446,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.imagePosition = .imageOnly
             button.image = MenuBarRenderer.image(
                 left: MenuBarRenderer.Column(symbol: leftSymbol, label: fiveLabel, value: fiveValue, valueColor: fiveColor),
-                right: MenuBarRenderer.Column(label: "Weekly Limit", value: weekValue, valueColor: weekColor),
+                right: MenuBarRenderer.Column(label: "Weekly", value: weekValue, valueColor: weekColor),
                 height: NSStatusBar.system.thickness,
                 leftMinWidth: reservedLeftWidth
             )
@@ -442,7 +465,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             if let reset = snap.fiveHourResetAt {
                 text += " (resets in \(formatTimeRemaining(until: reset)))"
             }
-            text += ", Weekly Limit \(weekPct)%"
+            text += ", Weekly \(weekPct)%"
             if let err = usageService.error { text += " — last update failed: \(err)" }
             description = text
         }
